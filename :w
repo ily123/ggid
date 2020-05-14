@@ -1,0 +1,31 @@
+
+class GoGraph:
+    """
+    Graph implementation of the Gene term Ontology
+
+    Note:
+
+        Implementation closely follows the one described in chapter 8
+        of Runestone's academy data strcutres course
+
+        https://runestone.academy/runestone/books/published/
+            pythonds/Graphs/Implementation.html
+    """
+
+
+    def __init__(self):
+        """
+        Keep track of all nodes using a dictionary
+        """
+        
+        self.nodes = {}
+
+    def add_node(self, node):
+        """
+        Push a new node into the node dictionary
+        """
+        self.nodes[node.id] = node
+
+    def get_node(self, term_id):
+        if term_id in self.nodes:
+            print("hi")
