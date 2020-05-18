@@ -1,3 +1,60 @@
+import re
+
+class OBOParser:
+    """
+    Gene Ontology .obo file parser
+    """
+
+    def __init__(self, obo_fp):
+        self.obo_fp = obo_fp
+
+    def parse_ontology(self):
+        """
+        Parse the .obo file
+        """
+
+        obo_file = open(self.obo_fp, 'r')
+        go_list = {}
+        blank_template = {'id': None, 'name': None, 'namespace': None,
+                          'def': None, 'is_a': []}
+
+        go_dag = GoGraph()
+        term_flag = False
+        for line in obo_file:
+            capture = re.search('(.+):\s(.+)\n', line)
+            if line == '[Term]\n':
+                term_flag = True
+            elif line == '\n':
+                term_flag = False
+                
+            if capture and term_flag:
+                name = capture.group(1)
+                content = capture.group(2)
+                if name == 'id':
+                    go_term = GoTerm(id_=content)
+                    go_dag.add_node(go_term) # push term into tree
+                elif name == 'is_a' or name == 'relationship':
+                    go_term.is_a.append(content)
+                    go_term.ancestor_ids.append(self.parse_ancestor_id(content))
+                elif name == 'name':
+                    go_term.name = content
+                elif name == 'namespace':
+                    go_term.namespace = content
+                elif name == 'def':
+                    go_term.definition = content
+        obo_file.close()
+        
+        return go_dag
+
+    def parse_ancestor_id(self, line):
+        """
+        Extracts go term ids from 'is_a' and 'relatioship' fields
+        """
+        capture = re.search('(GO:\d{7})\s!\s', line)
+        if capture:
+            return capture.group(1)
+
+
 
 class GoGraph:
     """
@@ -29,48 +86,108 @@ class GoGraph:
 
     def get_node(self, term_id):
         """
-        Return term node given term id (ex: GO:0000001)
+        Return term node given term id (ex: 'GO:0000001')
         """
 
         if term_id in self.nodes:
             return self.nodes[term_id]
         else:
             return None
-
-    def connect_nodes(self, ancestor_id, child_id):
-        """
-        Connect a child and an ancestor node given term ids
-
-        Note: nodes must already be present in self.nodes dict
-        """
-        
-        self.nodes[ancestor_id].set_child(self.nodes[child_id])
-        self.nodes[child_id].set_ancestor(self.nodes[ancestor_id])
-        
-
-class GoNode:
-    """
-    fff
-    """
     
-    def __init__(self, payload)
-        self.payload = payload
-        self.ancestors = []
-        self.children = []
+    def draw_connections(self):
+        """
+        Connect all ancestor and child nodes
+        """
 
-    def set_child(self, node):
-        self.child.append(node)
-    
-    def set_ancestor(self, node):
-        self.ancestors.append(node)
+        for node in self.nodes.values():
+            node_id = node.id
+            for ancestor_id in node.ancestor_ids:
+                self.connect_two_nodes(node_id, ancestor_id)
+
+    def connect_two_nodes(self, child_id, ancestor_id):
+        """
+        Connect a child and an ancestor node given their term ids
+
+        """
+
+        self.nodes[ancestor_id].add_child(self.nodes[child_id])
+        self.nodes[child_id].add_ancestor(self.nodes[ancestor_id])
+         
+    def traverse(self, node_id):
+        """
+        Traverse GO graph from given node to root
+        
+        Attributes:
+            node_id : str
+                GO term id of node (ex: 'GO:0000001')
+        Return:
+            ancestors : list
+                list of acestor GO term ids
+
+        Note:
+            The list of ancestor ids will have duplicates, because
+            in the GO ontology children can have multiple parents and 
+            so there are multiple paths leading to the root.
+            
+            For example:
+                
+                    /C\
+                A--B   F--root
+                    \D/
+
+            Calling traverse(A) will return 
+                [A, B, C, F, root, D, F, root]
+
+        """
+
+        ancestors = []
+
+        if self.nodes[node_id].ancestors != []:
+            for ancestor in self.nodes[node_id].ancestors:
+                ancestors.append(ancestor.id)
+                ancestors.extend(self.traverse(ancestor.id))
+
+        return ancestors
+
+
+    def get_full_ancestry(self, node_id):
+        """
+        Get all ancestors for a given term
+        
+        Attributes:
+            node_id : str
+                GO term id of node (ex: 'GO:0000001')
+        Return:
+            ancestors : list
+                list of acestor GO term ids
+        """
+
+        return list(set(self.traverse(node_id)))
 
 
 class GoTerm:
     """
-    Payload that goes with GoNode
+    Node in the Gene Ontology tree/dag
    
-    This contains all the pertinent information about the term
     """
 
+    def __init__(self, id_=None, namespace=None, definition=None, is_a=None):
 
-   # insert parsing logic here 
+        self.id = id_
+        self.namespace = namespace
+        self.definition = definition
+        if is_a == None:
+            self.is_a = []
+
+        self.ancestor_ids = []
+        self.child_ids = []
+        self.ancestors = []
+        self.children = []
+        
+    def add_child(self, child_term):
+        self.children.append(child_term)
+        self.child_ids.append(child_term.id)
+
+    def add_ancestor(self, ancestor_term):
+        self.ancestors.append(ancestor_term)
+
