@@ -1,4 +1,6 @@
+import numpy as np
 import re
+from scipy import sparse
 
 class OBOParser:
     """
@@ -136,7 +138,7 @@ class GoGraph:
                     \D/
 
             Calling traverse(A) will return 
-                [A, B, C, F, root, D, F, root]
+                [B, C, F, root, D, F, root]
 
         """
 
@@ -163,6 +165,43 @@ class GoGraph:
         """
 
         return list(set(self.traverse(node_id)))
+
+    def get_ancestry_table(self):
+        """
+        Get matrix mapping GO terms to ancestors up to the root
+        """
+        self.full_ancestry = {}
+        for node_id in list(self.nodes):
+            self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
+
+
+class AncestryMatrix:
+    """
+    Helper class to convert ancestry dictionary into a pandas df
+    """
+
+    def __init__(self, full_ancestry):
+        self.assign_index(full_ancestry)
+        self.full_ancestry = full_ancestry
+
+    def assign_index(self, full_ancestry):
+        go_terms = list(full_ancestry)
+        indeces = list(range(0,len(go_terms)))
+        index_dict = dict(zip(go_terms, indeces))
+        self.index_dict = index_dict
+
+    def get_matrix(self):
+        index_a = []
+        index_b = []
+
+        for term, ancestors in self.full_ancestry.items():
+            term_index = self.index_dict[term]
+            for ancestor_term in ancestors:
+                index_a.append(term_index)
+                index_b.append(self.index_dict[ancestor_term])
+        
+        self.matrix = sparse.coo_matrix((np.ones(len(index_a)), (index_a, index_b))) 
+
 
 
 class GoTerm:
