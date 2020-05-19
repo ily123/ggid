@@ -202,6 +202,21 @@ class AncestryMatrix:
         
         self.matrix = sparse.coo_matrix((np.ones(len(index_a)), (index_a, index_b))) 
 
+    def get_term_count(self, term_counts):
+        
+        vector = [] 
+        for term in list(self.index_dict):
+            if term in term_counts:
+                vector.append(term_counts[term])
+            else:
+                vector.append(0)
+        
+        return vector            
+
+    def get_deep_count(self, term_counts):
+
+        vector = np.array(self.get_term_count(term_counts)).reshape(-1,1)
+        return self.matrix.multiply(vector)
 
 
 class GoTerm:
