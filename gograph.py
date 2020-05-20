@@ -45,7 +45,8 @@ class OBOParser:
                 elif name == 'def':
                     go_term.definition = content
         obo_file.close()
-        
+
+        go_dag.draw_connections() # connect terms
         return go_dag
 
     def parse_ancestor_id(self, line):
@@ -166,23 +167,31 @@ class GoGraph:
 
         return list(set(self.traverse(node_id)))
 
-    def get_ancestry_table(self):
+    def make_ancestry_matrix(self):
         """
-        Get matrix mapping GO terms to ancestors up to the root
+        Create matrix mapping GO terms to their complete chain
+        of ancestor terms, up to the root
         """
         self.full_ancestry = {}
         for node_id in list(self.nodes):
             self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
-
+    
+        self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
+        
 
 class AncestryMatrix:
     """
-    Helper class to convert ancestry dictionary into a pandas df
+    Helper class to convert ancestry dictionary into a sparse matrix
+
+    Note:
+        This class is meant to simplify my life, as I don't want to write
+        a bunch of for-loops. It's probably a speed up as well.
     """
 
     def __init__(self, full_ancestry):
         self.assign_index(full_ancestry)
         self.full_ancestry = full_ancestry
+        self.get_matrix()
 
     def assign_index(self, full_ancestry):
         go_terms = list(full_ancestry)
@@ -202,7 +211,7 @@ class AncestryMatrix:
         
         self.matrix = sparse.coo_matrix((np.ones(len(index_a)), (index_a, index_b))) 
 
-    def get_term_count(self, term_counts):
+    def encode_annotation_vector(self, term_counts):
         
         vector = [] 
         for term in list(self.index_dict):
@@ -210,12 +219,13 @@ class AncestryMatrix:
                 vector.append(term_counts[term])
             else:
                 vector.append(0)
-        
-        return vector            
+        vector = np.array(vector).reshape(-1,1)
+        return vector
+
 
     def get_deep_count(self, term_counts):
 
-        vector = np.array(self.get_term_count(term_counts)).reshape(-1,1)
+        vector = self.encode_annotation_vector(term_counts)
         return self.matrix.multiply(vector)
 
 
