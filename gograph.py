@@ -176,6 +176,7 @@ class GoGraph:
         for node_id in list(self.nodes):
             self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
     
+        
         self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
         
 
@@ -219,9 +220,8 @@ class AncestryMatrix:
                 vector.append(term_counts[term])
             else:
                 vector.append(0)
-        vector = np.array(vector).reshape(-1,1)
-        return vector
-
+        
+        return np.array(vector).reshape(-1,1)       
 
     def get_deep_count(self, term_counts):
 

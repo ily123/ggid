@@ -3,34 +3,64 @@ import time
 class Similarity:
     """Calculate Resnik similarity between set of proteins/entities"""
 
-    def __init__(self, annotations, ontology, proteins, verbal=False):
+    def __init__(self, annotations, ontology, ft, proteins, namespace=None, verbose=False):
         
-       # if verbal:
-       #     t0 = time.time()
-       #     print('Parsing ontology file')
-       #     self.annotations = annotations
-       #     print('....done in %1.1f sec' % (time.time() - t0))
-       #     t0 = time.time()
-       #     self.ontology = ontology
-       #     self.proteins = proteins
-       # else:
-       self.annotations = annotations
-       self.ontology = ontology
-       self.proteins = proteins
-
+        self.annotations = annotations.annotations
+        self.ontology = ontology
+        self.proteins = proteins
+        self.ft = ft
+        
+        self.mica = {}
+        
+        if namespace:
+            self.annotations = self.annotations.loc[self.annotations.Aspect == namespace, :]
+        
     def calculate_similarity(self):
         """Calculate similarity for all-vs-all in the protien set"""
-        return 0
+        for protein_a in self.proteins:
+            for protein_b in self.proteins:
+                sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
+                #print(f'{protein_a} {protein_b} {sim}')
 
     def calculate_similarity_two_proteins(self, protein_a, protein_b):
         """Calculate Resnik similarity between two proteins"""
         
         #get protein a terms
-
-        # get protein b terms
+        terms_a = list(self.annotations.loc[self.annotations.DB_Object_Symbol==protein_a, 'GO_ID'])
+        terms_b = list(self.annotations.loc[self.annotations.DB_Object_Symbol==protein_b, 'GO_ID'])
         
         # run go terms through a all-vs-all get_mica()
-        return 0
+        avg = 0
+        for term_a in terms_a:
+            for term_b in terms_b:
+                avg += self.get_ic_mica(term_a, term_b)
+        return avg/(len(terms_a) * len(terms_b))
+
+    def get_ic_mica(self, term1, term2):
+        """
+        Given two GO terms, find information content of their
+        most informative common ancestor
+        """
+
+        ancestors1 = self.ontology.full_ancestry[term1]#.ancestor_ids
+        ancestors2 = self.ontology.full_ancestry[term2]#nodes[term2].ancestor_ids
+        
+        shared = list(set(ancestors1) & set(ancestors2))
+        if len(shared) == 0:
+            return 0
+       # print('---')
+       # print(term1)
+       # print(ancestors1)
+       # print(term2)
+       # print(ancestors2)
+       # print(shared)
+        most_specific = self.ft.ic[shared[0]]
+        # most specific has smallest absolute IC value
+        for ancestor in shared:
+            if self.ft.ic[ancestor] > most_specific:
+                most_specific = self.ft.ic[ancestor]
+        
+        return most_specific
 
     def get_exhaustive(self):
         """
@@ -49,22 +79,3 @@ class Similarity:
         """
         
         return 0
-
-    def get_ic_mica(self, term1, term2):
-        """
-        Given two GO terms, find information content of their
-        most informative common ancestor
-        """
-
-        ancestors1 = term1.ancestors
-        ancestors2 = term2.ancestors
-        
-        shared = list(set(ancestors1) & set(ancestors2))
-        most_specific = shared[0]
-        # most specific has smallest absolute IC value
-        for ancestor in shared:
-            if ancestor.get_ic < most_specific.get_ic:
-                most_specific = ancestor.get_ic
-        
-        return 0
-

@@ -49,6 +49,6 @@ class FrequencyTable():
         self.deep_count = ancestry_matrix.get_deep_count(shallow_count)
         self.index_dict = ancestry_matrix.index_dict
 
-        self.information_content = -1*np.log(self.deep_count.sum(axis=0)/self.deep_count.sum())
+        self.information_content = -1*np.log10(self.deep_count.sum(axis=0)/self.deep_count.sum())
         self.ic = dict(zip(list(self.index_dict),
             self.information_content.tolist()[0]))
