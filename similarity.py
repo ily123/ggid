@@ -11,29 +11,49 @@ class Similarity:
         self.ft = ft
         
         self.mica = {}
+        self.ic_mica = {}
+        self.counter = 0
         
         if namespace:
             self.annotations = self.annotations.loc[self.annotations.Aspect == namespace, :]
         
+        self.annotations2 = self.get_anno_dict(annotations.annotations)
+       
+    def get_anno_dict(self, annotations):
+        """
+        Convert pandas df of entity->term into a dictionary
+        of dict[entity]=[term1, term2, termn
+        """
+        return dict(annotations.groupby('DB_Object_Symbol')['GO_ID'].apply(list))
+
     def calculate_similarity(self):
         """Calculate similarity for all-vs-all in the protien set"""
-        for protein_a in self.proteins:
-            for protein_b in self.proteins:
-                sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
+        for a, protein_a in enumerate(self.proteins):
+            for b, protein_b in enumerate(self.proteins):
+                if b > a:
+                    sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
                 #print(f'{protein_a} {protein_b} {sim}')
 
     def calculate_similarity_two_proteins(self, protein_a, protein_b):
         """Calculate Resnik similarity between two proteins"""
         
         #get protein a terms
-        terms_a = list(self.annotations.loc[self.annotations.DB_Object_Symbol==protein_a, 'GO_ID'])
-        terms_b = list(self.annotations.loc[self.annotations.DB_Object_Symbol==protein_b, 'GO_ID'])
+        terms_a = self.annotations2[protein_a]
+        terms_b = self.annotations2[protein_b]
         
         # run go terms through a all-vs-all get_mica()
         avg = 0
         for term_a in terms_a:
             for term_b in terms_b:
-                avg += self.get_ic_mica(term_a, term_b)
+                self.counter += 1
+                if (term_a, term_b) in self.ic_mica:
+                    avg += self.ic_mica[(term_a, term_b)]
+                else:
+                    ic_mica = self.get_ic_mica(term_a, term_b)
+                    self.ic_mica[(term_a, term_b)] = ic_mica
+                    self.ic_mica[(term_b, term_a)] = ic_mica
+                    avg += ic_mica
+
         return avg/(len(terms_a) * len(terms_b))
 
     def get_ic_mica(self, term1, term2):
@@ -46,6 +66,7 @@ class Similarity:
         ancestors2 = self.ontology.full_ancestry[term2]#nodes[term2].ancestor_ids
         
         shared = list(set(ancestors1) & set(ancestors2))
+        #shared = [val for val in ancestors1 if val in ancestors2]
         if len(shared) == 0:
             return 0
        # print('---')
