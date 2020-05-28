@@ -1,4 +1,6 @@
 import time
+import multiprocessing
+from scipy import sparse
 
 class Similarity:
     """Calculate Resnik similarity between set of proteins/entities"""
@@ -13,6 +15,10 @@ class Similarity:
         self.mica = {}
         self.ic_mica = {}
         self.counter = 0
+
+        #self.proteins = list(set(self.annotations.DB_Object_Symbol) & set(proteins))
+        self.proteins = list(set(self.annotations.DB_Object_ID) & set(proteins))
+        print(len(self.proteins))
         
         if namespace:
             self.annotations = self.annotations.loc[self.annotations.Aspect == namespace, :]
@@ -24,15 +30,40 @@ class Similarity:
         Convert pandas df of entity->term into a dictionary
         of dict[entity]=[term1, term2, termn
         """
-        return dict(annotations.groupby('DB_Object_Symbol')['GO_ID'].apply(list))
+        #return dict(annotations.groupby('DB_Object_Symbol')['GO_ID'].apply(list))
+        return dict(annotations.groupby('DB_Object_ID')['GO_ID'].apply(list))
 
     def calculate_similarity(self):
         """Calculate similarity for all-vs-all in the protien set"""
+        index_a = []
+        index_b = []
+        values = []
         for a, protein_a in enumerate(self.proteins):
             for b, protein_b in enumerate(self.proteins):
                 if b > a:
                     sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
+                    index_a.append(a)
+                    index_b.append(b)
+                    values.append(sim)
                 #print(f'{protein_a} {protein_b} {sim}')
+        self.sim_matrix = sparse.coo_matrix((values, (index_a, index_b)))
+
+    def calc_sim_segment(self, list_a, list_all):
+        print("worker started")
+        t = time.time()
+        for protein_a in list_a:
+            for protein_b in list_all:
+                sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
+        print("worker done", time.time()-t)
+
+    def calculate_similarity_mult_cpu(self):
+        self.workers = []
+        for i in list(range(2)):
+            sublist = self.proteins
+            p = multiprocessing.Process(target=self.calc_sim_segment, args=(sublist, self.proteins,))
+            self.workers.append(p)
+            p.start()
+
 
     def calculate_similarity_two_proteins(self, protein_a, protein_b):
         """Calculate Resnik similarity between two proteins"""
