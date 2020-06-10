@@ -40,7 +40,7 @@ class Similarity:
         values = []
         for a, protein_a in enumerate(self.proteins):
             for b, protein_b in enumerate(self.proteins):
-                if b > a:
+                if b >= a:
                     sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
                     index_a.append(a)
                     index_b.append(b)
