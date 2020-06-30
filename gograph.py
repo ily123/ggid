@@ -28,7 +28,7 @@ class OBOParser:
                 term_flag = True
             elif line == '\n':
                 term_flag = False
-                
+
             if capture and term_flag:
                 name = capture.group(1)
                 content = capture.group(2)
@@ -77,14 +77,14 @@ class GoGraph:
         """
         Keep track of all nodes using a dictionary
         """
-        
+
         self.nodes = {}
 
     def add_node(self, node):
         """
         Push a new node into the node dictionary
         """
-        
+
         self.nodes[node.id] = node
 
     def get_node(self, term_id):
@@ -96,7 +96,7 @@ class GoGraph:
             return self.nodes[term_id]
         else:
             return None
-    
+
     def draw_connections(self):
         """
         Connect all ancestor and child nodes
@@ -115,11 +115,11 @@ class GoGraph:
 
         self.nodes[ancestor_id].add_child(self.nodes[child_id])
         self.nodes[child_id].add_ancestor(self.nodes[ancestor_id])
-         
+
     def traverse(self, node_id):
         """
         Traverse GO graph from given node to root
-        
+
         Attributes:
             node_id : str
                 GO term id of node (ex: 'GO:0000001')
@@ -129,16 +129,16 @@ class GoGraph:
 
         Note:
             The list of ancestor ids will have duplicates, because
-            in the GO ontology children can have multiple parents and 
+            in the GO ontology children can have multiple parents and
             so there are multiple paths leading to the root.
-            
+
             For example:
-                
+
                     /C\
                 A--B   F--root
                     \D/
 
-            Calling traverse(A) will return 
+            Calling traverse(A) will return
                 [B, C, F, root, D, F, root]
 
         """
@@ -156,7 +156,7 @@ class GoGraph:
     def get_full_ancestry(self, node_id):
         """
         Get all ancestors for a given term
-        
+
         Attributes:
             node_id : str
                 GO term id of node (ex: 'GO:0000001')
@@ -175,10 +175,10 @@ class GoGraph:
         self.full_ancestry = {}
         for node_id in list(self.nodes):
             self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
-    
-        
+
+
         self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
-        
+
 
 class AncestryMatrix:
     """
@@ -209,19 +209,19 @@ class AncestryMatrix:
             for ancestor_term in ancestors:
                 index_a.append(term_index)
                 index_b.append(self.index_dict[ancestor_term])
-        
-        self.matrix = sparse.coo_matrix((np.ones(len(index_a)), (index_a, index_b))) 
+
+        self.matrix = sparse.coo_matrix((np.ones(len(index_a)), (index_a, index_b)))
 
     def encode_annotation_vector(self, term_counts):
-        
-        vector = [] 
+
+        vector = []
         for term in list(self.index_dict):
             if term in term_counts:
                 vector.append(term_counts[term])
             else:
                 vector.append(0)
-        
-        return np.array(vector).reshape(-1,1)       
+
+        return np.array(vector).reshape(-1,1)
 
     def get_deep_count(self, term_counts):
 
@@ -231,8 +231,7 @@ class AncestryMatrix:
 
 class GoTerm:
     """
-    Node in the Gene Ontology tree/dag
-   
+    Node in the Gene Ontology tree/dag.
     """
 
     def __init__(self, id_=None, namespace=None, definition=None, is_a=None):
@@ -247,7 +246,7 @@ class GoTerm:
         self.child_ids = []
         self.ancestors = []
         self.children = []
-        
+
     def add_child(self, child_term):
         self.children.append(child_term)
         self.child_ids.append(child_term.id)

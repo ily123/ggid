@@ -1,65 +1,114 @@
-from scipy import sparse
-import numpy as np
-from scipy.sparse.linalg import lgmres
+"""
+Diffuse information across networks.
+"""
 
+import numpy as np
+import pandas as pd
+
+from scipy.sparse.linalg import lgmres
+from scipy import sparse
+
+from kinapp_helper import InputValidator
 
 class Diffusion:
     """
-    Propagate label across a graph
-    
+    Propagate label across a graph.
+
     Attributes
     ----------
     attr1 : type
         description
-
-    Methods
-    ------
-
     """
 
     def __init__(self, network, labels):
         """
+        Inits diffusion experiment with network and starting labels.
+
         Parameters
-        ---------
+        ----------
         network : sparse coo matrix
             graph represented as an adjacency matrix
         labels : list
             indeces of nodes that carry the initial label
         """
-        
+
         self.network = network
         self.labels = labels
 
+    @staticmethod
+    def get_label_indices(labels):
+        """
+        Converts protein ids to their network indices.
+
+        Returns
+        -------
+        labels_indexed : list[int]
+            position of proteins in the network matrix
+        """
+        hugo_ids = {k : v for v, k in enumerate(InputValidator().hugo)}
+
+        labels_indexed = []
+        for label in labels:
+            labels_indexed.append(hugo_ids[label])
+        return labels_indexed
+
     def diffuse(self):
         """
-        Diffuse labels across network
+        Diffuse labels across network.
         """
-        
-        lpp = self.get_lpp()
-        alpha = self.get_diffusion_parameter(lpp)
-        ps = self.get_ps(alpha, lpp) 
-        
-        y = np.zeros([self.network.shape[0],1])
-        y[0] = 1
-        #diffuse
-        result = lgmres(ps, y, maxiter=1000, atol=0.001)#, atol=0, maxiter=1e3)
-        return result
-    
-    def get_ps(self, lpp, alpha):
 
+        lpp = sparse.csgraph.laplacian(self.network)
+        alpha = 1 / float(np.max(np.sum(np.abs(lpp), axis=0)))
         ident = sparse.csc_matrix(np.eye(self.network.shape[0]))
         ps = ident + alpha*lpp
-        return ps
 
-    def get_lpp(self):
+        initial_label_state = np.zeros(self.network.shape[0])
+        label_indices = self.get_label_indices(self.labels)
+        initial_label_state[label_indices] = 1
+
+        #diffuse
+        diff_out = lgmres(ps, initial_label_state, maxiter=1000, atol=0.001)#, atol=0, maxiter=1e3)
+        final_label_state = diff_out[0]
+        result = DiffusionResult(final_label_state,
+                                 initial_label_state,
+                                 InputValidator().hugo)
+        return result
+
+class DiffusionResult:
+    """
+    Class to namespace functions for dealing with diffusion output.
+    """
+
+    def __init__(self, result, labels, proteins):
         """
-        Calculates the network Laplacian
+        Inits instance with diffusion output and corresponding protein names.
+
+        Parameters
+        ----------
+        result : numpy array
+            Output of scipy.sparse.linalg.lgmres call; diffusion result
+        labels : list[str]
+            List of input labels in the diffusion
         """
-        return sparse.csgraph.laplacian(self.network)
 
-    def get_diffusion_parameter(self, lpp):
-        diffusionParameter = 1 / float( np.max( np.sum(np.abs(lpp), axis=0) ) )
-        return diffusionParameter
+        self.initial_labels = labels
+        self.final_labels = result
+        self.proteins = proteins[2:]
+        print(len(result), len(labels), len(self.proteins))
+        print(result, labels, self.proteins)
 
-        
+    def get_as_pandas_df(self, include_z_score = False):
+        """
+        Formats diffusion output as pandas df
+        """
+        self.result = pd.DataFrame({'protein':self.proteins,
+                                    'initial_label':self.initial_labels,
+                                    'final_label':self.final_labels})
+        self.result.sort_values(by='final_label', ascending=False, inplace=True)
 
+        if include_z_score:
+            z_score_result = self.result[self.result.initial_label==0].copy()
+            z_score_result['z_score'] = (z_score_result.final_label
+                                         - z_score_result.final_label.mean())/z_score_result.final_label.std()
+            return z_score_result
+        return self.result

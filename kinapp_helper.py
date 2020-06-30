@@ -1,8 +1,18 @@
+"""
+Helper functions for the kinase network diffusion program.
+
+Typical usage example:
+
+    validator = InputValidator()
+    legal_ids = validator.validate(list_of_protein_ids)
+
+"""
+
 import pandas as pd
 
 class InputValidator:
     """
-    Helper functions for the kinase diffusion app
+    Helper functions for the kinase diffusion app.
 
     Attributes
     ----------
@@ -11,26 +21,28 @@ class InputValidator:
         list of kinase ids in uniprot format (uniprot.com)
     hugo : list
         list of kinase ids in HUGO format (https://www.genenames.org/)
-    fp : str
+    kinase_fp : str
         file path of the CSV file with the ids
     """
 
     def __init__(self):
-
-        self.fp = 'data/list_of_human_kinases.csv'
+        """
+        Inits InputValidator class and loads list of legal kinase ids.
+        """
+        self.kinase_fp = 'data/list_of_human_kinases.csv'
         self.parse_kinase_file()
-    
+
     def parse_kinase_file(self):
         """
-        Parses uniprot & hugo IDs from the CSV file
+        Parses uniprot & hugo IDs from the CSV file.
         """
-        kinase_df = pd.read_csv(self.fp)
+        kinase_df = pd.read_csv(self.kinase_fp)
         self.uniprot = [p.upper() for p in list(kinase_df['uniprot'])]
         self.hugo = [p.upper() for p in list(kinase_df['gene_symbol'])]
-    
+
     def validate(self, inputs):
         """
-        Validates that user supplies protein ids in eitheir uniprot or HUGO format
+        Validates that user supplies protein ids in eitheir uniprot or HUGO format.
 
         Parameters
         ---------
@@ -40,17 +52,12 @@ class InputValidator:
         Returns
         -------
         validated : list
-            list of input proteins that are present in network
+            subset of input proteins that are actually present in network
         """
 
-        assert type(inputs) == list, "expected a list"
-        
-        inputs = [p.upper() for p in inputs]
-        validated = []
-        for protein in inputs:
-            if protein in self.hugo:
-                validated.append(protein)
+        if not isinstance(inputs, list):
+            raise ValueError("expected a list")
+
+        inputs = [protein.upper() for protein in inputs]
+        validated = [protein for protein in inputs if protein in self.hugo]
         return validated
-    
-    def blah(self):
-        print(0)
