@@ -35,8 +35,7 @@ class Diffusion:
         self.network = network
         self.labels = labels
 
-    @staticmethod
-    def get_label_indices(labels):
+    def get_label_indices(self, labels):
         """
         Converts protein ids to their network indices.
 
@@ -45,7 +44,7 @@ class Diffusion:
         labels_indexed : list[int]
             position of proteins in the network matrix
         """
-        hugo_ids = {k : v for v, k in enumerate(InputValidator().hugo)}
+        hugo_ids = {k : v for v, k in enumerate(self.network.protein_list)}
 
         labels_indexed = []
         for label in labels:
@@ -57,12 +56,12 @@ class Diffusion:
         Diffuse labels across network.
         """
 
-        lpp = sparse.csgraph.laplacian(self.network)
+        lpp = sparse.csgraph.laplacian(self.network.adj_matrix)
         alpha = 1 / float(np.max(np.sum(np.abs(lpp), axis=0)))
-        ident = sparse.csc_matrix(np.eye(self.network.shape[0]))
+        ident = sparse.csc_matrix(np.eye(self.network.adj_matrix.shape[0]))
         ps = ident + alpha*lpp
 
-        initial_label_state = np.zeros(self.network.shape[0])
+        initial_label_state = np.zeros(self.network.adj_matrix.shape[0])
         label_indices = self.get_label_indices(self.labels)
         initial_label_state[label_indices] = 1
 
@@ -71,7 +70,7 @@ class Diffusion:
         final_label_state = diff_out[0]
         result = DiffusionResult(final_label_state,
                                  initial_label_state,
-                                 InputValidator().hugo)
+                                 self.network.protein_list)
         return result
 
 class DiffusionResult:
@@ -93,7 +92,7 @@ class DiffusionResult:
 
         self.initial_labels = labels
         self.final_labels = result
-        self.proteins = proteins[2:]
+        self.proteins = proteins
         print(len(result), len(labels), len(self.proteins))
         print(result, labels, self.proteins)
 

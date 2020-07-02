@@ -13,6 +13,16 @@
     Added title to tab, added favicon.
 
 ### jul 1 session
-    fix protein index tracking [MAJOR]
+    Created SimilarityMatrix container class that holds both the network and the protein ids.
+    Inputs now correctly map to the network.
+    Formatted Data table (pagination and precision) -- almost good, Dash seems to hide trailing 0s
+
+
+### jul 2 session
+
+
+
+### LTR:
+    show pic of immediate network...
     write LOO code + figure
     make app show LOO results?...

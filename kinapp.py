@@ -14,6 +14,7 @@ import re
 import diffusion
 from kinapp_helper import InputValidator
 
+pd.options.display.float_format = '${:,.2f}'.format
 
 cyto.load_extra_layouts()
 
@@ -88,6 +89,16 @@ def parse_input(text):
     re.findall('\w+', text)
 
 
+#from dash_table.Format import Format, Group, Scheme, Symbol
+#frmt = Format(scheme=Scheme.fixed, precision=2, group=Group.yes,
+#                groups=3,
+#                group_delimiter='.',
+#                decimal_delimiter=',')
+
+
+import dash_table.FormatTemplate as FormatTemplate
+from dash_table.Format import Format, Scheme, Sign, Symbol
+
 @app.callback([
     Output('output', 'children'),
     Output('output', 'style'),
@@ -108,13 +119,20 @@ def print_output(n_clicks, value):
         dif = diffusion.Diffusion(network, valid_labels)
         res = dif.diffuse()
         df = res.get_as_pandas_df(include_z_score=True)
+        df['z_score']=df['z_score'].map("{:,.3f}".format)
+        df['final_label']=df['final_label'].map("{:,.4}".format)
+
+
         msg = f"Diffusing from nodes # {', '.join([str(x) for x in valid_labels])}"
         print(df.head())
         return dash_table.DataTable(
                 id='hi',
+#                columns=[{"name": i, "id": i, 'type':'numeric','format':Format(precision=3)} for i in df.columns],
                 columns=[{"name": i, "id": i} for i in df.columns],
                 data = df.to_dict('records'),
-                export_columns='all', export_format='csv'
+                export_columns='all',
+                export_format='csv',
+                page_size=20
             ), {'display':'flex', 'justifyContent':'center'}, msg
 
     return None, None, None
