@@ -89,12 +89,14 @@ class DiffusionResult:
         labels : list[str]
             List of input labels in the diffusion
         """
-
         self.initial_labels = labels
         self.final_labels = result
         self.proteins = proteins
-        print(len(result), len(labels), len(self.proteins))
-        print(result, labels, self.proteins)
+        self.protein_to_final_label = dict(zip(proteins, result))
+
+
+        #print(len(result), len(labels), len(self.proteins))
+        #print(result, labels, self.proteins)
 
     def get_as_pandas_df(self, include_z_score = False):
         """
@@ -111,3 +113,9 @@ class DiffusionResult:
                                          - z_score_result.final_label.mean())/z_score_result.final_label.std()
             return z_score_result
         return self.result
+
+    def get_result_for_protein(self, protein):
+        """
+        Get post-diffusion score for specific protein.
+        """
+        return self.protein_to_final_label[protein]

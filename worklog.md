@@ -18,8 +18,8 @@
     Formatted Data table (pagination and precision) -- almost good, Dash seems to hide trailing 0s
 
 
-### jul 2 session
-
+### jul 4 session
+    Wrote basic LOO code. It works but is ugly.
 
 
 ### LTR:
