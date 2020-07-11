@@ -85,6 +85,7 @@ class Similarity:
 
         # run go terms through a all-vs-all get_mica()
         avg = 0
+        best_mica = 0
         for term_a in terms_a:
             for term_b in terms_b:
                 self.counter += 1
@@ -95,8 +96,10 @@ class Similarity:
                     self.ic_mica[(term_a, term_b)] = ic_mica
                     self.ic_mica[(term_b, term_a)] = ic_mica
                     avg += ic_mica
-
-        return avg/(len(terms_a) * len(terms_b))
+                    if ic_mica > best_mica:
+                        best_mica = ic_mica
+        return best_mica
+#        return avg/(len(terms_a) * len(terms_b))
 
     def get_ic_mica(self, term1, term2):
         """
@@ -162,7 +165,9 @@ class SimilarityMatrix():
             List of proteins in the matrix, sorted so that
             row (column) i in sim_matrix corresponds to protein[i].
         """
-        self.sim_matrix = sim_matrix
+        self.sim_matrix = sim_matrix + sim_matrix.T
+        self.sim_matrix = self.sim_matrix.todense()
+        np.fill_diagonal(self.sim_matrix, 0)
         self.protein_list = protein_list
 
     def threshold_matrix(self, n=None):
@@ -187,13 +192,22 @@ class SimilarityMatrix():
 
         if not n:
             n = np.ceil(np.sqrt(len(self.protein_list)))
-
-        adj_matrix = self.sim_matrix.todense() # have to convert for argsort
-        mask = adj_matrix.argsort(axis=0) < n
-        adj_matrix[mask] = 1
-        adj_matrix[~mask] = 0
-        adj_matrix = sparse.coo_matrix(adj_matrix)
+        n = int(n)
+        print(n)
+        #adj_matrix = self.sim_matrix.todense() # have to convert for argsort
+        adj_matrix = self.sim_matrix#.copy()
+        top_n_edge_cutoff = np.partition(adj_matrix, len(self.protein_list)-n, axis=1)[:, len(self.protein_list)-n]
+        mask_top_n_edge = adj_matrix >= top_n_edge_cutoff
+        adj_matrix[mask_top_n_edge] = 1
+        adj_matrix[~mask_top_n_edge] = 0
+        #mask = adj_matrix.argsort(axis=1) > (len(self.protein_list) - n - 1)
+        #adj_matrix[mask] = 1
+        #adj_matrix[~mask] = 0
+        #adj_matrix = adj_matrix + adj_matrix.T
+        #adj_matrix[adj_matrix > 0] = 1
+        #adj_matrix = sparse.coo_matrix(adj_matrix)
         self.adj_matrix = adj_matrix
+        print(adj_matrix)
 
     def save_as_pickle(self, save_path):
         """

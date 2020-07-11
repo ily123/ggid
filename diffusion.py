@@ -55,7 +55,7 @@ class Diffusion:
         """
         Diffuse labels across network.
         """
-
+        #self.network.adj_matrix = self.network.sim_matrix
         lpp = sparse.csgraph.laplacian(self.network.adj_matrix)
         alpha = 1 / float(np.max(np.sum(np.abs(lpp), axis=0)))
         ident = sparse.csc_matrix(np.eye(self.network.adj_matrix.shape[0]))
@@ -66,7 +66,7 @@ class Diffusion:
         initial_label_state[label_indices] = 1
 
         #diffuse
-        diff_out = lgmres(ps, initial_label_state, maxiter=1000, atol=0.001)#, atol=0, maxiter=1e3)
+        diff_out = lgmres(ps, initial_label_state, maxiter=10000, atol=0.001)#, atol=0, maxiter=1e3)
         final_label_state = diff_out[0]
         result = DiffusionResult(final_label_state,
                                  initial_label_state,
@@ -105,7 +105,8 @@ class DiffusionResult:
         self.result = pd.DataFrame({'protein':self.proteins,
                                     'initial_label':self.initial_labels,
                                     'final_label':self.final_labels})
-        self.result.sort_values(by='final_label', ascending=False, inplace=True)
+        print('hi')
+        #self.result.sort_values(by='final_label', ascending=False, inplace=True)
 
         if include_z_score:
             z_score_result = self.result[self.result.initial_label==0].copy()

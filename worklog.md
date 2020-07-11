@@ -21,6 +21,8 @@
 ### jul 4 session
     Wrote basic LOO code. It works but is ugly.
 
+### jul 8 session
+    trying to get p53 loo to work // fixing bugs
 
 ### LTR:
     show pic of immediate network...
