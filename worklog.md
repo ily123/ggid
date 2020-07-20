@@ -23,8 +23,28 @@
 
 ### jul 8 session
     trying to get p53 loo to work // fixing bugs
+    loo auc for p53 kinases is strangely low (0.60), something is broken
 
-### LTR:
-    show pic of immediate network...
-    write LOO code + figure
-    make app show LOO results?...
+### jul 11 session
+    filtered out proteins with low annotation number (auc still ~0.65)
+    examined BMA network derived by ffsim - edge disto a lot smoother
+    it appears that using max(sim(a,b)) edges creates lots of equal
+        edges that don't threshold (numpy partition does not break ties),
+        and it desentitizes the network
+    implemented BMA - YAY! Network  works now, AUC = 0.87!
+
+### jul 15 session
+    made png figure of post-diffusion distro of z-scores
+    inserted figure into web-app /ugly/ - i don't understand html/div positioning logic
+    replaced png figure with dash's own 'graph' component
+
+### jul 19 session
+    fixed DF output to presented data sorted
+    added zscore and rank to web app output
+    added .css style sheet
+    added test outline to each div
+    inserted cytoscape network view into web-app
+
+### jul 20 session
+    rewrite tracking protocol
+    construct network view for label and best results

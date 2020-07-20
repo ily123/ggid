@@ -1,0 +1,10 @@
+* { border: 1px solid green; }
+
+#kin-map {
+    border: 2px solid red;
+}
+
+#kin-map-container {
+    border: 3px solid blue;
+}
+

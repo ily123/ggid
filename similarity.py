@@ -11,7 +11,7 @@ import numpy as np
 import pickle
 
 class Similarity:
-    """Calculate Resnik similarity between set of proteins/entities"""
+    """Calculate Resnik similarity between proteins/entities in a set."""
 
     def __init__(self, annotations, ontology, ft, proteins, namespace=None, verbose=False):
 
@@ -33,6 +33,13 @@ class Similarity:
             self.annotations = self.annotations.loc[self.annotations.Aspect == namespace, :]
 
         self.annotations2 = self.get_anno_dict(annotations.annotations)
+
+    def sanitize_protein_list(self):
+        """Removes proteins with low number of annotations."""
+
+        #self.proteins = [k for k, v in self.annotations2.items() if v > 4]
+        self.proteins = [p for p in self.proteins if len(self.annotations2[p]) > 9]
+
 
     def get_anno_dict(self, annotations):
         """
@@ -86,20 +93,34 @@ class Similarity:
         # run go terms through a all-vs-all get_mica()
         avg = 0
         best_mica = 0
+
+        row_micas = []
         for term_a in terms_a:
+            row_mica = 0
             for term_b in terms_b:
                 self.counter += 1
+                ic_mica = 0
                 if (term_a, term_b) in self.ic_mica:
-                    avg += self.ic_mica[(term_a, term_b)]
+                    ic_mica = self.ic_mica[(term_a, term_b)]
                 else:
                     ic_mica = self.get_ic_mica(term_a, term_b)
                     self.ic_mica[(term_a, term_b)] = ic_mica
                     self.ic_mica[(term_b, term_a)] = ic_mica
-                    avg += ic_mica
-                    if ic_mica > best_mica:
-                        best_mica = ic_mica
-        return best_mica
+
+                if ic_mica > row_mica:
+                    row_mica = ic_mica
+
+                if ic_mica > best_mica:
+                    best_mica = ic_mica
+            row_micas.append(row_mica)
+#        return best_mica
 #        return avg/(len(terms_a) * len(terms_b))
+        return np.array(row_micas).mean()
+        #  a b c
+        #d x x x
+        #e x x x
+        #f x x x
+
 
     def get_ic_mica(self, term1, term2):
         """
@@ -193,21 +214,15 @@ class SimilarityMatrix():
         if not n:
             n = np.ceil(np.sqrt(len(self.protein_list)))
         n = int(n)
-        print(n)
-        #adj_matrix = self.sim_matrix.todense() # have to convert for argsort
-        adj_matrix = self.sim_matrix#.copy()
-        top_n_edge_cutoff = np.partition(adj_matrix, len(self.protein_list)-n, axis=1)[:, len(self.protein_list)-n]
+        adj_matrix = self.sim_matrix.copy()
+        net_size = len(self.protein_list)
+        top_n_edge_cutoff = np.partition(adj_matrix, net_size-n, axis=1)[:, net_size-n]
         mask_top_n_edge = adj_matrix >= top_n_edge_cutoff
         adj_matrix[mask_top_n_edge] = 1
         adj_matrix[~mask_top_n_edge] = 0
-        #mask = adj_matrix.argsort(axis=1) > (len(self.protein_list) - n - 1)
-        #adj_matrix[mask] = 1
-        #adj_matrix[~mask] = 0
         #adj_matrix = adj_matrix + adj_matrix.T
         #adj_matrix[adj_matrix > 0] = 1
-        #adj_matrix = sparse.coo_matrix(adj_matrix)
         self.adj_matrix = adj_matrix
-        print(adj_matrix)
 
     def save_as_pickle(self, save_path):
         """

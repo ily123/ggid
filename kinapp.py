@@ -28,7 +28,7 @@ def make_nodes(network):
     Constructs cytoscape elements (node) dict from COO matrix
     """
     elements = []
-    node_i, node_j = network.nonzero()
+    node_i, node_j = network.adj_matrix.nonzero()
     track = []
     for index, label_i in enumerate(node_i):
         label_j = node_j[index]
@@ -39,8 +39,8 @@ def make_nodes(network):
             elements.append({'data': {'id': label_j, 'label': label_j}})
             track.append(label_j)
         elements.append({'data': {'source': label_i, 'target': label_j}})
-        #if index > 500:
-        #    break
+        if index > 50:
+            break
     print(len(elements))
     return elements
 
@@ -50,35 +50,34 @@ app.title = 'GGid'
 
 app.layout = html.Div(
     [
-#        cyto.Cytoscape(
-#            id='kin-map',
-#            layout={'name': 'circle'},
-#            #layout={'name': 'cose-bilkent', 'numIter': 50, 'padding': 30,
-#            #        'nodeDimensionsIncludeLabels': 'true'},
-#            #layout={'name': 'cola', 'numIter': 10},
-#            #layout={'name': 'klay', 'numIter': 10},
-#            #layout={'name': 'dagre', 'numIter': 10},
-#            style={'width': '100%', 'height': '1200px'},
-#            elements=make_nodes(network)
-#        ),
-
         html.Div(
             dcc.Textarea(
                 id='kinase-list',
                 placeholder='Enter kinase IDs in HUGO format (ex: CDC7, AURAB)',
-                style={'margin':'auto', 'width': '75%', 'height': '20%'}
-                #value='ABC'
+                style={'margin':'auto', 'width': '75%', 'height': '20%'},
+                value='CDK1'
             ),
             style={'display':'flex', 'justifyContent':'center', 'padding':'100px 0px 0px 0px'}
         ),
-
         html.Div(
             html.Button('SUBMIT', id='submit-button', n_clicks=None),
             style={'display':'flex', 'justifyContent':'center'}
         ),
-
+        html.Div(id='kin-map-container',
+            children=cyto.Cytoscape(
+                id='kin-map',
+                #layout={'name': 'circle'},
+                layout={'name': 'cose-bilkent', 'numIter': 50, 'padding': 30,
+                        'nodeDimensionsIncludeLabels': 'true'},
+                #layout={'name': 'cola', 'numIter': 10},
+                #layout={'name': 'klay', 'numIter': 10},
+                #layout={'name': 'dagre', 'numIter': 10},
+                style={'width': '75%', 'height': '500px', 'display':'flex'},
+                elements=make_nodes(network)
+            ),
+            style={'justifyContent':'center', 'display':'flex'}
+        ),
         html.Div(id='response', children="some text"),
-
         html.Div(id='output', style={'display':'none'})
     ]
     #style={'background-image':image_url, 'background-size':'cover', 'height':'100%', 'position':'fixed', 'width':'100%', 'top':'0px', 'left':'0px'}
@@ -118,14 +117,15 @@ def print_output(n_clicks, value):
 
         dif = diffusion.Diffusion(network, valid_labels)
         res = dif.diffuse()
-        df = res.get_as_pandas_df(include_z_score=True)
-        df['z_score']=df['z_score'].map("{:,.3f}".format)
-        df['final_label']=df['final_label'].map("{:,.4}".format)
+
+        df = res.get_as_pandas_df_without_labels()
+        #df['z_score']=df['z_score'].map("{:,.3f}".format)
+        #df['final_label']=df['final_label'].map("{:,.4}".format)
 
 
         msg = f"Diffusing from nodes # {', '.join([str(x) for x in valid_labels])}"
         print(df.head())
-        return dash_table.DataTable(
+        return [dash_table.DataTable(
                 id='hi',
 #                columns=[{"name": i, "id": i, 'type':'numeric','format':Format(precision=3)} for i in df.columns],
                 columns=[{"name": i, "id": i} for i in df.columns],
@@ -133,7 +133,11 @@ def print_output(n_clicks, value):
                 export_columns='all',
                 export_format='csv',
                 page_size=20
-            ), {'display':'flex', 'justifyContent':'center'}, msg
+            )
+            #html.Div(dcc.Graph(id='test_graph', figure={'data':[{'x':[1,2,3], 'y':[1,2,3], 'type':'bar'}]}))
+            #html.Div(html.Img(src=app.get_asset_url('post_diffusion_pic.png'))),
+            #html.Img(src=app.get_asset_url('post_diffusion_pic.png')),
+            ],{'display':'flex', 'justifyContent':'center'}, msg
 
     return None, None, None
 

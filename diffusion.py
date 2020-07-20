@@ -4,8 +4,10 @@ Diffuse information across networks.
 
 import numpy as np
 import pandas as pd
+pd.options.mode.chained_assignment = None
 
-from scipy.sparse.linalg import lgmres
+from scipy import stats
+from scipy.sparse.linalg import lgmres, minres
 from scipy import sparse
 
 from kinapp_helper import InputValidator
@@ -65,8 +67,8 @@ class Diffusion:
         label_indices = self.get_label_indices(self.labels)
         initial_label_state[label_indices] = 1
 
-        #diffuse
-        diff_out = lgmres(ps, initial_label_state, maxiter=10000, atol=0.001)#, atol=0, maxiter=1e3)
+        #diff_out = minres(ps, initial_label_state, maxiter=1000, tol=1e-12)
+        diff_out = lgmres(ps, initial_label_state, maxiter=1000, atol=1e-12)
         final_label_state = diff_out[0]
         result = DiffusionResult(final_label_state,
                                  initial_label_state,
@@ -98,7 +100,7 @@ class DiffusionResult:
         #print(len(result), len(labels), len(self.proteins))
         #print(result, labels, self.proteins)
 
-    def get_as_pandas_df(self, include_z_score = False):
+    def get_as_pandas_df_with_labels(self):
         """
         Formats diffusion output as pandas df
         """
@@ -108,12 +110,16 @@ class DiffusionResult:
         print('hi')
         #self.result.sort_values(by='final_label', ascending=False, inplace=True)
 
-        if include_z_score:
-            z_score_result = self.result[self.result.initial_label==0].copy()
-            z_score_result['z_score'] = (z_score_result.final_label
-                                         - z_score_result.final_label.mean())/z_score_result.final_label.std()
-            return z_score_result
         return self.result
+
+    def get_as_pandas_df_without_labels(self):
+        result = self.get_as_pandas_df_with_labels()
+        result = result[result.initial_label==0]
+        result['zscore'] = stats.zscore(result.final_label)
+        result['rank'] = result.zscore.rank(ascending=False)
+        result.sort_values(by='final_label', ascending=False, inplace=True)
+        return result
+
 
     def get_result_for_protein(self, protein):
         """
