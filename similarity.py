@@ -9,11 +9,13 @@ import multiprocessing
 from scipy import sparse
 import numpy as np
 import pickle
+import pandas as pd
 
-class Similarity:
+
+class SimilarityCalculator:
     """Calculate Resnik similarity between proteins/entities in a set."""
 
-    def __init__(self, annotations, ontology, ft, proteins, namespace=None, verbose=False):
+    def __init__(self, annotations, ontology, ft, proteins, namespace=None):
 
         self.annotations = annotations.annotations
         self.ontology = ontology
@@ -25,7 +27,6 @@ class Similarity:
         self.counter = 0
 
         self.proteins = list(set(self.annotations.DB_Object_Symbol) & set(proteins))
-        #self.proteins = list(set(self.annotations.DB_Object_ID) & set(proteins))
         self.proteins.sort()
         print(len(self.proteins))
 
@@ -37,20 +38,17 @@ class Similarity:
     def sanitize_protein_list(self):
         """Removes proteins with low number of annotations."""
 
-        #self.proteins = [k for k, v in self.annotations2.items() if v > 4]
         self.proteins = [p for p in self.proteins if len(self.annotations2[p]) > 9]
 
 
     def get_anno_dict(self, annotations):
-        """
-        Convert pandas df of entity->term into a dictionary
-        of dict[entity]=[term1, term2, termn
-        """
+        """Convert pandas df of entity->term into a dictionary."""
+
         return dict(annotations.groupby('DB_Object_Symbol')['GO_ID'].apply(list))
-        #return dict(annotations.groupby('DB_Object_ID')['GO_ID'].apply(list))
 
     def calculate_similarity(self):
-        """Calculate similarity for all-vs-all in the protien set"""
+        """Calculate similarity for all-vs-all in the protien set."""
+
         index_a = []
         index_b = []
         values = []
@@ -61,10 +59,8 @@ class Similarity:
                     index_a.append(a)
                     index_b.append(b)
                     values.append(sim)
-                #print(f'{protein_a} {protein_b} {sim}')
         sim_matrix = sparse.coo_matrix((values, (index_a, index_b)))
         self.sim_matrix = SimilarityMatrix(sim_matrix, self.proteins)
-
 
     def calc_sim_segment(self, list_a, list_all):
         print("worker started")
@@ -84,7 +80,7 @@ class Similarity:
 
 
     def calculate_similarity_two_proteins(self, protein_a, protein_b):
-        """Calculate Resnik similarity between two proteins"""
+        """Calculate Resnik similarity between two proteins."""
 
         #get protein a terms
         terms_a = self.annotations2[protein_a]
@@ -123,24 +119,19 @@ class Similarity:
 
 
     def get_ic_mica(self, term1, term2):
-        """
-        Given two GO terms, find information content of their
-        most informative common ancestor
+        """Given two terms, Find IC of their  MICA.
+
+            Note:
+            IC - information content (frequency of occurance)
+            MICA - most informative common ancestor
         """
 
-        ancestors1 = self.ontology.full_ancestry[term1]#.ancestor_ids
-        ancestors2 = self.ontology.full_ancestry[term2]#nodes[term2].ancestor_ids
+        ancestors1 = self.ontology.full_ancestry[term1]
+        ancestors2 = self.ontology.full_ancestry[term2]
 
         shared = list(set(ancestors1) & set(ancestors2))
-        #shared = [val for val in ancestors1 if val in ancestors2]
         if len(shared) == 0:
             return 0
-       # print('---')
-       # print(term1)
-       # print(ancestors1)
-       # print(term2)
-       # print(ancestors2)
-       # print(shared)
         most_specific = self.ft.ic[shared[0]]
         # most specific has smallest absolute IC value
         for ancestor in shared:
@@ -168,32 +159,53 @@ class Similarity:
         return 0
 
 class SimilarityMatrix():
-    """
-    Similairity matrix and its protein ids.
-    """
+    """Similairity matrix and its protein ids."""
 
-    def __init__(self, sim_matrix, protein_list):
-        """
-        Inits the similarity matrix container.
+    def __init__(self, raw_similarity, proteins):
+        """Inits the similarity matrix container.
 
         Parameters
         ----------
-        sim_matrix : numpy 2d array
+        raw_similarity : numpy 2d array
             Matrix containing protein-protein GO term similarity scores, so that
-            sim_matrix[i, j] contains similarity score for proteins i and j.
+            raw_similarity[i, j] contains similarity score for proteins i and j.
 
-        protein_list : list[str]
+        proteins : list[str]
             List of proteins in the matrix, sorted so that
-            row (column) i in sim_matrix corresponds to protein[i].
+            row (column) i in raw_similarity corresponds to protein[i].
         """
-        self.sim_matrix = sim_matrix + sim_matrix.T
-        self.sim_matrix = self.sim_matrix.todense()
-        np.fill_diagonal(self.sim_matrix, 0)
-        self.protein_list = protein_list
+
+        self.raw_similarity = raw_similarity + raw_similarity.T
+        self.raw_similarity = self.raw_similarity.todense()
+        np.fill_diagonal(self.raw_similarity, 0)
+        self.proteins = proteins
+
+    def get_protein_name_by_index(self, protein_index):
+        """Get protein name given it's position (index) in network matrix."""
+
+        return self.proteins[protein_index]
+
+    def get_protein_index(self, protein_name):
+        """Get protein index (position) in network matrix given protein's name."""
+
+        if protein_name not in self.proteins:
+            return None
+        else:
+            return self.proteins.index(protein_name.upper())
+
+    def get_similarity_vector_for_protein(self, protein_name):
+        """Given a protein return it's similarity to other proteins in network."""
+
+        protein_index = self.get_protein_index(protein_name)
+        if protein_index:
+            similarity_vector = self.raw_similarity[protein_index, :].tolist()[0]
+            return pd.DataFrame({'protein': self.proteins,
+                                 'similarity_score': similarity_vector})
+        else:
+            return None
 
     def threshold_matrix(self, n=None):
-        """
-        Converts similarity matrix into network.
+        """Converts similarity matrix into a network.
 
         For each protein, sets its N most similar connections to 1,
         and zero-outs the rest.
@@ -212,21 +224,25 @@ class SimilarityMatrix():
         """
 
         if not n:
-            n = np.ceil(np.sqrt(len(self.protein_list)))
+            n = np.ceil(np.sqrt(len(self.proteins)))
         n = int(n)
-        adj_matrix = self.sim_matrix.copy()
-        net_size = len(self.protein_list)
+        adj_matrix = self.raw_similarity.copy()
+        net_size = len(self.proteins)
         top_n_edge_cutoff = np.partition(adj_matrix, net_size-n, axis=1)[:, net_size-n]
         mask_top_n_edge = adj_matrix >= top_n_edge_cutoff
         adj_matrix[mask_top_n_edge] = 1
         adj_matrix[~mask_top_n_edge] = 0
-        #adj_matrix = adj_matrix + adj_matrix.T
-        #adj_matrix[adj_matrix > 0] = 1
         self.adj_matrix = adj_matrix
 
+    def enforce_adj_matrix_symmetry():
+        """Updates the adjacency matrix to be symmetric about the diagonal."""
+
+        symmetric_adj_matrix = self.adj_matrix + self.adj_matrix.T
+        symmetric_adj_matrix[symmetric_adj_matrix > 0] = 1
+        self.adj_matrix = symmetric_adj_matrix
+
     def save_as_pickle(self, save_path):
-        """
-        Pickles self to at given file path.
+        """Pickles self to a given file path.
 
         Parameters
         ----------
