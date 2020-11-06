@@ -2,3 +2,9 @@
 todolist
 data/*
 results/*
+*.pyc
+*.pkl
+.ipynb_checkpoints/
+__pycache__/
+worklog.md
+.DS_Store
