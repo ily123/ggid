@@ -46,7 +46,7 @@ class Diffusion:
         labels_indexed : list[int]
             position of proteins in the network matrix
         """
-        hugo_ids = {k: v for v, k in enumerate(self.network.protein_list)}
+        hugo_ids = {k: v for v, k in enumerate(self.network.proteins)}
 
         labels_indexed = []
         for label in labels:
@@ -71,7 +71,7 @@ class Diffusion:
         diff_out = lgmres(ps, initial_label_state, maxiter=1000, atol=1e-12)
         final_label_state = diff_out[0]
         result = DiffusionResult(
-            final_label_state, initial_label_state, self.network.protein_list
+            final_label_state, initial_label_state, self.network.proteins
         )
         return result
 

@@ -1,10 +1,13 @@
-import diffusion
 import numpy as np
 import pandas as pd
-import sklearn
-#from sklearn.metrics import roc_auc_score
+import sklearn.metrics
 
-class LOOValitation():
+import diffusion
+
+# from sklearn.metrics import roc_auc_score
+
+
+class LOOValitation:
     """
     Leave-one-out cross validation of input labels.
     """
@@ -16,7 +19,7 @@ class LOOValitation():
         self.network = network
         self.labels = labels
         if len(self.labels) < 2:
-            raise('need at least 2 labels for cross-validation')
+            raise ("need at least 2 labels for cross-validation")
 
     def run_validation(self):
         """
@@ -34,7 +37,7 @@ class LOOValitation():
             label_score[left_out_label] = result.get_result_for_protein(left_out_label)
             print(left_out_label, result.get_result_for_protein(left_out_label))
         avg_result = self.average_results(score_vectors)
-        avg_result = self.format_result_as_pd_df(avg_result, self.network.protein_list)
+        avg_result = self.format_result_as_pd_df(avg_result, self.network.proteins)
         avg_result = self.replace_labels(avg_result, label_score)
 
         self.avg_result = avg_result
@@ -49,7 +52,7 @@ class LOOValitation():
         agg = score_vectors[0]
         for result in score_vectors[1:]:
             agg = np.add(agg, result)
-        avg = agg/len(score_vectors)
+        avg = agg / len(score_vectors)
         return avg
 
     @staticmethod
@@ -58,8 +61,7 @@ class LOOValitation():
         Converts result vector into pandas data frame.
         """
 
-        return pd.DataFrame({'protein_name': proteins,
-                             'avg_label': avg_result})
+        return pd.DataFrame({"protein_name": proteins, "avg_label": avg_result})
 
     @staticmethod
     def replace_labels(avg_result, label_score):
@@ -67,17 +69,17 @@ class LOOValitation():
         Insert left-out label scores into final label result.
         """
         print(label_score)
-        avg_result['label'] = 0
+        avg_result["label"] = 0
         for protein, score in label_score.items():
-            avg_result.loc[avg_result.protein_name == protein, 'avg_label'] = score
-            avg_result.loc[avg_result.protein_name == protein, 'label'] = 1
+            avg_result.loc[avg_result.protein_name == protein, "avg_label"] = score
+            avg_result.loc[avg_result.protein_name == protein, "label"] = 1
         return avg_result
 
     def get_auc(self):
-        #self.avg_result
+        # self.avg_result
         y_true = self.avg_result.label
         y_scores = self.avg_result.avg_label
         return sklearn.metrics.roc_auc_score(y_true, y_scores)
 
-    #@staticmethod
-    #def get_auc():
+    # @staticmethod
+    # def get_auc():

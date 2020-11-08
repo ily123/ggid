@@ -1,0 +1,11 @@
+numpy
+pandas
+scipy
+sklearn
+plotly
+dash
+dash_cytoscape
+jupyter
+matplotlib
+requests
+beautifulsoup4
