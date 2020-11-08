@@ -1,8 +1,6 @@
-import re
-
 import numpy as np
+import re
 from scipy import sparse
-
 
 class OBOParser:
     """
@@ -17,52 +15,48 @@ class OBOParser:
         Parse the .obo file
         """
 
-        obo_file = open(self.obo_fp, "r")
+        obo_file = open(self.obo_fp, 'r')
         go_list = {}
-        blank_template = {
-            "id": None,
-            "name": None,
-            "namespace": None,
-            "def": None,
-            "is_a": [],
-        }
+        blank_template = {'id': None, 'name': None, 'namespace': None,
+                          'def': None, 'is_a': []}
 
         go_dag = GoGraph()
         term_flag = False
         for line in obo_file:
-            capture = re.search("(.+):\s(.+)\n", line)
-            if line == "[Term]\n":
+            capture = re.search('(.+):\s(.+)\n', line)
+            if line == '[Term]\n':
                 term_flag = True
-            elif line == "\n":
+            elif line == '\n':
                 term_flag = False
 
             if capture and term_flag:
                 name = capture.group(1)
                 content = capture.group(2)
-                if name == "id":
+                if name == 'id':
                     go_term = GoTerm(id_=content)
-                    go_dag.add_node(go_term)  # push term into tree
-                elif name == "is_a" or name == "relationship":
+                    go_dag.add_node(go_term) # push term into tree
+                elif name == 'is_a' or name == 'relationship':
                     go_term.is_a.append(content)
                     go_term.ancestor_ids.append(self.parse_ancestor_id(content))
-                elif name == "name":
+                elif name == 'name':
                     go_term.name = content
-                elif name == "namespace":
+                elif name == 'namespace':
                     go_term.namespace = content
-                elif name == "def":
+                elif name == 'def':
                     go_term.definition = content
         obo_file.close()
 
-        go_dag.draw_connections()  # connect terms
+        go_dag.draw_connections() # connect terms
         return go_dag
 
     def parse_ancestor_id(self, line):
         """
         Extracts go term ids from 'is_a' and 'relatioship' fields
         """
-        capture = re.search("(GO:\d{7})\s!\s", line)
+        capture = re.search('(GO:\d{7})\s!\s', line)
         if capture:
             return capture.group(1)
+
 
 
 class GoGraph:
@@ -77,6 +71,7 @@ class GoGraph:
         https://runestone.academy/runestone/books/published/
             pythonds/Graphs/Implementation.html
     """
+
 
     def __init__(self):
         """
@@ -157,6 +152,7 @@ class GoGraph:
 
         return ancestors
 
+
     def get_full_ancestry(self, node_id):
         """
         Get all ancestors for a given term
@@ -180,6 +176,7 @@ class GoGraph:
         for node_id in list(self.nodes):
             self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
 
+
         self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
 
 
@@ -199,7 +196,7 @@ class AncestryMatrix:
 
     def assign_index(self, full_ancestry):
         go_terms = list(full_ancestry)
-        indeces = list(range(0, len(go_terms)))
+        indeces = list(range(0,len(go_terms)))
         index_dict = dict(zip(go_terms, indeces))
         self.index_dict = index_dict
 
@@ -224,7 +221,7 @@ class AncestryMatrix:
             else:
                 vector.append(0)
 
-        return np.array(vector).reshape(-1, 1)
+        return np.array(vector).reshape(-1,1)
 
     def get_deep_count(self, term_counts):
 
@@ -256,3 +253,4 @@ class GoTerm:
 
     def add_ancestor(self, ancestor_term):
         self.ancestors.append(ancestor_term)
+

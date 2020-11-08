@@ -1,16 +1,16 @@
+print("reloaded")
 """
 Calculates GO term similarity between a set of proteins to
 produce a similarity matrix, which can then be converted into a
 protein-protein network for diffusion.
 """
 
-import multiprocessing
-import pickle
 import time
-
-import numpy as np
-import pandas as pd
+import multiprocessing
 from scipy import sparse
+import numpy as np
+import pickle
+import pandas as pd
 
 
 class SimilarityCalculator:
@@ -31,21 +31,21 @@ class SimilarityCalculator:
         self.proteins.sort()
 
         if namespace:
-            self.annotations = self.annotations.loc[
-                self.annotations.Aspect == namespace, :
-            ]
+            self.annotations = self.annotations.loc[self.annotations.Aspect == namespace, :]
 
         self.annotations2 = self.get_anno_dict(annotations.annotations)
 
-    def sanitize_protein_list(self):
+    def sanitize_protein_list(self, min_annotations=5):
         """Removes proteins with low number of annotations."""
 
-        self.proteins = [p for p in self.proteins if len(self.annotations2[p]) > 9]
+        print(min_annotations)
+        self.proteins = [p for p in self.proteins
+                         if len(self.annotations2[p]) >= min_annotations]
 
     def get_anno_dict(self, annotations):
         """Convert pandas df of entity->term into a dictionary."""
 
-        return dict(annotations.groupby("DB_Object_Symbol")["GO_ID"].apply(list))
+        return dict(annotations.groupby('DB_Object_Symbol')['GO_ID'].apply(list))
 
     def calculate_similarity(self):
         """Calculate similarity for all-vs-all in the protien set."""
@@ -61,6 +61,7 @@ class SimilarityCalculator:
                     index_b.append(b)
                     values.append(sim)
         sim_matrix = sparse.coo_matrix((values, (index_a, index_b)))
+        self.store_sim_matrix = sim_matrix
         self.sim_matrix = SimilarityMatrix(sim_matrix, self.proteins)
 
     def calc_sim_segment(self, list_a, list_all):
@@ -69,26 +70,21 @@ class SimilarityCalculator:
         for protein_a in list_a:
             for protein_b in list_all:
                 sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
-        print("worker done", time.time() - t)
+        print("worker done", time.time()-t)
 
     def calculate_similarity_mult_cpu(self):
         self.workers = []
         for i in list(range(2)):
             sublist = self.proteins
-            p = multiprocessing.Process(
-                target=self.calc_sim_segment,
-                args=(
-                    sublist,
-                    self.proteins,
-                ),
-            )
+            p = multiprocessing.Process(target=self.calc_sim_segment, args=(sublist, self.proteins,))
             self.workers.append(p)
             p.start()
+
 
     def calculate_similarity_two_proteins(self, protein_a, protein_b):
         """Calculate Resnik similarity between two proteins."""
 
-        # get protein a terms
+        #get protein a terms
         terms_a = self.annotations2[protein_a]
         terms_b = self.annotations2[protein_b]
 
@@ -115,20 +111,21 @@ class SimilarityCalculator:
                 if ic_mica > best_mica:
                     best_mica = ic_mica
             row_micas.append(row_mica)
-        #        return best_mica
-        #        return avg/(len(terms_a) * len(terms_b))
+#        return best_mica
+#        return avg/(len(terms_a) * len(terms_b))
         return np.array(row_micas).mean()
         #  a b c
-        # d x x x
-        # e x x x
-        # f x x x
+        #d x x x
+        #e x x x
+        #f x x x
+
 
     def get_ic_mica(self, term1, term2):
         """Given two terms, Find IC of their  MICA.
 
-        Note:
-        IC - information content (frequency of occurance)
-        MICA - most informative common ancestor
+            Note:
+            IC - information content (frequency of occurance)
+            MICA - most informative common ancestor
         """
 
         ancestors1 = self.ontology.full_ancestry[term1]
@@ -163,8 +160,7 @@ class SimilarityCalculator:
 
         return 0
 
-
-class SimilarityMatrix:
+class SimilarityMatrix():
     """Similairity matrix and its protein ids."""
 
     def __init__(self, raw_similarity, proteins):
@@ -205,9 +201,8 @@ class SimilarityMatrix:
         protein_index = self.get_protein_index(protein_name)
         if protein_index:
             similarity_vector = self.raw_similarity[protein_index, :].tolist()[0]
-            return pd.DataFrame(
-                {"protein": self.proteins, "similarity_score": similarity_vector}
-            )
+            return pd.DataFrame({'protein': self.proteins,
+                                 'similarity_score': similarity_vector})
         else:
             return None
 
@@ -235,20 +230,26 @@ class SimilarityMatrix:
         n = int(n)
         adj_matrix = self.raw_similarity.copy()
         net_size = len(self.proteins)
-        top_n_edge_cutoff = np.partition(adj_matrix, net_size - n, axis=1)[
-            :, net_size - n
-        ]
+        top_n_edge_cutoff = np.partition(adj_matrix, net_size-n, axis=1)[:, net_size-n]
         mask_top_n_edge = adj_matrix >= top_n_edge_cutoff
         adj_matrix[mask_top_n_edge] = 1
         adj_matrix[~mask_top_n_edge] = 0
         self.adj_matrix = adj_matrix
 
-    def enforce_adj_matrix_symmetry():
+    def enforce_adj_matrix_symmetry(self):
         """Updates the adjacency matrix to be symmetric about the diagonal."""
 
         symmetric_adj_matrix = self.adj_matrix + self.adj_matrix.T
         symmetric_adj_matrix[symmetric_adj_matrix > 0] = 1
         self.adj_matrix = symmetric_adj_matrix
+
+    def get_edges_for_protein(self, protein):
+        """Gets a list of proteins that the query protein is connected to."""
+
+        protein_index = self.get_protein_index(protein)
+        edge_indices = self.adj_matrix[protein_index, :].nonzero()[1].tolist()
+        edge_names = [self.get_protein_name_by_index(i) for i in edge_indices]
+        return edge_names
 
     def save_as_pickle(self, save_path):
         """Pickles self to a given file path.
@@ -259,4 +260,4 @@ class SimilarityMatrix:
             Desired file path of the output pickle file.
         """
 
-        pickle.dump(self, open(save_path, "wb"))
+        pickle.dump(self, open(save_path, 'wb'))
