@@ -6,8 +6,10 @@ import dash_core_components as dcc
 import dash_cytoscape as cyto
 import dash_html_components as html
 import dash_table
+import dash_table.FormatTemplate as FormatTemplate
 import pandas as pd
 from dash.dependencies import Input, Output, State
+from dash_table.Format import Format, Scheme, Sign, Symbol
 from scipy import sparse
 
 import diffusion
@@ -50,63 +52,65 @@ app = dash.Dash(__name__)
 app.title = "GGid"
 
 app.layout = html.Div(
-    [
-        html.Div(
-            dcc.Textarea(
-                id="kinase-list",
-                placeholder="Enter kinase IDs in HUGO format (ex: CDC7, AURAB)",
-                style={"margin": "auto", "width": "75%", "height": "20%"},
-                value="CDK1",
-            ),
-            style={
-                "display": "flex",
-                "justifyContent": "center",
-                "padding": "100px 0px 0px 0px",
+    html.Div(
+        dcc.Textarea(
+            id="kinase-list",
+            placeholder="Enter kinase IDs in HUGO format (ex: CDC7, AURAB)",
+            style={"margin": "auto", "width": "75%", "height": "20%"},
+            value="CDK1",
+        ),
+        style={
+            "display": "flex",
+            "justifyContent": "center",
+            "padding": "100px 0px 0px 0px",
+        },
+    ),
+    html.Div(
+        html.Button("SUBMIT", id="submit-button", n_clicks=None),
+        style={"display": "flex", "justifyContent": "center"},
+    ),
+    html.Div(
+        html.Details(
+            children=[
+                html.Summary("Config Menu"),
+                dcc.Checklist(
+                    options={"label": "conduct LOO validation", "value": True},
+                    value=True,
+                ),
+            ],
+            id="config-menu",
+        ),
+        style={"display": "flex", "justifyContent": "center"},
+    ),
+    html.Div(
+        id="kin-map-container",
+        children=cyto.Cytoscape(
+            id="kin-map",
+            # layout={'name': 'circle'},
+            layout={
+                "name": "cose-bilkent",
+                "numIter": 50,
+                "padding": 30,
+                "nodeDimensionsIncludeLabels": "true",
             },
+            # layout={'name': 'cola', 'numIter': 10},
+            # layout={'name': 'klay', 'numIter': 10},
+            # layout={'name': 'dagre', 'numIter': 10},
+            style={"width": "75%", "height": "500px", "display": "flex"},
+            elements=make_nodes(network),
         ),
-        html.Div(
-            html.Button("SUBMIT", id="submit-button", n_clicks=None),
-            style={"display": "flex", "justifyContent": "center"},
-        ),
-        html.Div(
-            id="kin-map-container",
-            children=cyto.Cytoscape(
-                id="kin-map",
-                # layout={'name': 'circle'},
-                layout={
-                    "name": "cose-bilkent",
-                    "numIter": 50,
-                    "padding": 30,
-                    "nodeDimensionsIncludeLabels": "true",
-                },
-                # layout={'name': 'cola', 'numIter': 10},
-                # layout={'name': 'klay', 'numIter': 10},
-                # layout={'name': 'dagre', 'numIter': 10},
-                style={"width": "75%", "height": "500px", "display": "flex"},
-                elements=make_nodes(network),
-            ),
-            style={"justifyContent": "center", "display": "flex"},
-        ),
-        html.Div(id="response", children="some text"),
-        html.Div(id="output", style={"display": "none"}),
-    ]
+        style={"justifyContent": "center", "display": "flex"},
+    ),
+    html.Div(id="response", children="some text"),
+    html.Div(id="output", style={"display": "none"}),
     # style={'background-image':image_url, 'background-size':'cover', 'height':'100%', 'position':'fixed', 'width':'100%', 'top':'0px', 'left':'0px'}
 )
-
-
-def parse_input(text):
-    re.findall("\w+", text)
-
 
 # from dash_table.Format import Format, Group, Scheme, Symbol
 # frmt = Format(scheme=Scheme.fixed, precision=2, group=Group.yes,
 #                groups=3,
 #                group_delimiter='.',
 #                decimal_delimiter=',')
-
-
-import dash_table.FormatTemplate as FormatTemplate
-from dash_table.Format import Format, Scheme, Sign, Symbol
 
 
 @app.callback(

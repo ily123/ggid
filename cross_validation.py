@@ -1,10 +1,13 @@
-import diffusion
 import numpy as np
 import pandas as pd
 import sklearn.metrics
-#from sklearn.metrics import roc_auc_score
 
-class LOOValitation():
+import diffusion
+
+# from sklearn.metrics import roc_auc_score
+
+
+class LOOValitation:
     """
     Leave-one-out cross validation of input labels.
     """
@@ -16,7 +19,7 @@ class LOOValitation():
         self.network = network
         self.labels = labels
         if len(self.labels) < 2:
-            raise('need at least 2 labels for cross-validation')
+            raise ("need at least 2 labels for cross-validation")
 
     def run_validation(self):
         """
@@ -49,7 +52,7 @@ class LOOValitation():
         agg = score_vectors[0]
         for result in score_vectors[1:]:
             agg = np.add(agg, result)
-        avg = agg/len(score_vectors)
+        avg = agg / len(score_vectors)
         return avg
 
     @staticmethod
@@ -58,8 +61,7 @@ class LOOValitation():
         Converts result vector into pandas data frame.
         """
 
-        return pd.DataFrame({'protein_name': proteins,
-                             'avg_label': avg_result})
+        return pd.DataFrame({"protein_name": proteins, "avg_label": avg_result})
 
     @staticmethod
     def replace_labels(avg_result, label_score):
@@ -67,17 +69,24 @@ class LOOValitation():
         Insert left-out label scores into final label result.
         """
         print(label_score)
-        avg_result['label'] = 0
+        avg_result["label"] = 0
         for protein, score in label_score.items():
-            avg_result.loc[avg_result.protein_name == protein, 'avg_label'] = score
-            avg_result.loc[avg_result.protein_name == protein, 'label'] = 1
+            avg_result.loc[avg_result.protein_name == protein, "avg_label"] = score
+            avg_result.loc[avg_result.protein_name == protein, "label"] = 1
         return avg_result
 
-    def get_auc(self):
-        #self.avg_result
-        y_true = self.avg_result.label
-        y_scores = self.avg_result.avg_label
-        return sklearn.metrics.roc_auc_score(y_true, y_scores)
+    def get_roc(self):
+        # self.avg_result
+        labels = self.avg_result.label
+        pred_scores = self.avg_result.avg_label
+        fpr, tpr, _ = sklearn.metrics.roc_curve(
+            y_true=labels, y_score=pred_scores, pos_label=1
+        )
+        auc = sklearn.metrics.auc(fpr, tpr)
+        auc2 = sklearn.metrics.roc_auc_score(y_true=labels, y_score=pred_scores)
+        print(auc)
+        print(auc2)
+        return [tpr, fpr, auc]
 
-    #@staticmethod
-    #def get_auc():
+    # @staticmethod
+    # def get_auc():
