@@ -42,6 +42,76 @@ def get_diffusion_result(labeled_kinases):
     return zscore_table, graph_nodes, node_styling
 
 
+def get_cross_validation_result(labeled_kinases):
+    """Does LOO validation and returns container with formatted results."""
+    loo_experiment = cross_validation.LOOValitation(network, labeled_kinases)
+    zscore_table = loo_experiment.run_validation()
+    # get ROC figure
+    tpr, fpr, auc = loo_experiment.get_roc()
+    fig = draw_roc_curve(tpr, fpr)
+    # define results div
+    result_div = html.Div(
+        children=[
+            html.Details(
+                children=[
+                    html.Summary(
+                        "Cross-validation AUC is %1.2f (expand for details)" % auc
+                    ),
+                    html.Ul(
+                        children=[
+                            html.Li(
+                                """
+                                AUC ~= 0.50: information does not diffuse between the
+                                given kinases.
+                                This is because the kinases are not closely connected in
+                                the network.
+                                Either the network is not modeling their
+                                relationship properly, or these kinases are not
+                                very similar (i.e. do not share low-level GO terms).
+                                You should diffuse each kinase on its own
+                                to find its functional neighbors.
+                                """
+                            ),
+                            html.Li(
+                                """
+                                0.60 < AUC < 0.80: there is some signal! The kinases in
+                                the set diffuse some information to each other,
+                                meaning they are somewhat connected in the network.
+
+                                Alternatively, there could
+                                be two independent kinase clusters of in your set.
+                                Kinases within the same cluster are predictive of each
+                                other, but not of the kinases in the other cluster.
+                                Each cluster may be responsible for some unique
+                                sub-function relevant to the overall process.
+                                Identify the clusters by looking at the graph visual
+                                above, and diffuse each cluster on its own to find
+                                its functional neighbors.
+                                """
+                            ),
+                            html.Li(
+                                """
+                                AUC > 0.80: kinases are strongly predictive of each
+                                other. They are well connected in the network, and thier
+                                neighbors may be involved in the same type of process.
+                                For the list of their closest neigbors see table below.
+                                """
+                            ),
+                        ]
+                    ),
+                    dcc.Graph(id="loo-roc", figure=fig),
+                ],
+            ),
+            convert_to_dash_table(zscore_table),
+        ]
+    )
+    # make updated graph
+    graph_nodes, node_styling = create_cytoscape_div(
+        network, labeled_kinases, zscore_table
+    )
+    return result_div, graph_nodes, node_styling
+
+
 def convert_to_dash_table(zscore_table):
     """Converts pandas zscore table to Dash data table."""
 
@@ -59,9 +129,10 @@ def convert_to_dash_table(zscore_table):
 def draw_roc_curve(tpr, fpr):
     """Creates plotly scatter for the ROC curve."""
     fig = go.Figure()
-    trace = go.Scatter(x=tpr, y=fpr)
+    trace = go.Scatter(x=fpr, y=tpr)
     fig.add_trace(trace)
     fig.update_layout(width=500, height=500)
+    fig.layout.title = "Leave-one-out cross-validation ROC"
     return fig
 
 
@@ -116,7 +187,7 @@ def make_nodes2(sim_matrix, labels, proteins=[]):
 
 def create_cytoscape_div(sim_matrix, labels, diffusion_result):
     """Constructs updated cytoscape div."""
-    top_hits = diffusion_result[diffusion_result.zscore >= 2]
+    top_hits = diffusion_result[diffusion_result.zscore >= 1]
     top_hits = list(top_hits.protein.values)
     elements = make_nodes2(sim_matrix, labels, top_hits)
     new_elements = elements
@@ -170,6 +241,8 @@ def make_selectors_colors(colors):
 
 
 def get_colors(diffusion_result):
+    mask = diffusion_result.zscore >= 1
+    diffusion_result = diffusion_result.loc[mask, :]
     xcolor_gradient = color_gradient.ColorGradientGenerator()
     xcolor_gradient.create_color_map2(base_color=[128, 128, 128])
     # xcolor_gradient.create_color_map(palette='Greens')
@@ -185,8 +258,13 @@ app = dash.Dash(
 app.title = "GGid"
 
 app.layout = html.Div(
+    id="main-container",
     # style={'background-image': 'url(https://upload.wikimedia.org/wikipedia/commons/2/22/North_Star_-_invitation_background.png)'},
     children=[
+        html.H1("GGID: Human Kinome"),
+        html.P(
+            "Diffuse information over Gene Ontology-derived network of human kinases."
+        ),
         html.Div(
             dcc.Textarea(
                 id="kinase-list",
@@ -207,10 +285,36 @@ app.layout = html.Div(
         html.Div(
             dcc.Checklist(
                 id="loo-switch",
-                options=[{"label": "conduct LOO validation", "value": "loo_true"}],
-                value=[],
+                options=[
+                    {
+                        "label": "cross-validate (2+ kinases)",
+                        "value": "on",
+                    }
+                ],
+                value=[],  # when you click checkmark its value is added to this list
             ),
             style={"display": "flex", "justifyContent": "center"},
+        ),
+        dcc.RadioItems(
+            id="network-layout",
+            options=[
+                {"label": "Circle", "value": "circle"},
+                {"label": "Concentric", "value": "concentric"},
+                {"label": "Spread", "value": "spread"},
+                {"label": "Force-directed", "value": "cola"},
+                # leaving layouts below, so I don't have to look
+                # up docs again if I need extra layouts
+                # {"label": "Cose", "value": "cose"},
+                # {"label": "Cose-Bilkenet", "value": "cose-bilkent"},
+                # {"label": "Euler", "value": "euler"},
+                # {"label": "Klay", "value": "klay"},
+                # {"label": "Dagre", "value": "dagre"},
+            ],
+            value="circle",
+            style={
+                "display": "flex",
+                "margin": "auto",
+            },
         ),
         html.Div(
             id="kin-map-container",
@@ -218,28 +322,18 @@ app.layout = html.Div(
                 cyto.Cytoscape(
                     id="kin-map",
                     layout={"name": "circle"},
-                    style={"width": "75%", "height": "500px", "display": "flex"},
+                    style={
+                        "height": "600px",
+                        "width": "100%",
+                        "border": "1px solid grey",
+                        "justifyContent": "center",
+                    },
                     elements=make_nodes(network),
-                ),
-                dcc.RadioItems(
-                    id="network-layout",
-                    options=[
-                        {"label": "Circle", "value": "circle"},
-                        {"label": "Klay", "value": "klay"},
-                        {"label": "Dagre", "value": "dagre"},
-                        {"label": "Cola", "value": "cola"},
-                        {"label": "Cose", "value": "cose"},
-                        {"label": "Cose-Bilkenet", "value": "cose-bilkent"},
-                        {"label": "Euler", "value": "euler"},
-                        {"label": "Spread", "value": "spread"},
-                        {"label": "Concentric", "value": "concentric"},
-                    ],
-                    value="circle",
                 ),
             ],
             style={"justifyContent": "center", "display": "flex"},
         ),
-        html.Div(id="status-line"),
+        html.Div(id="status-line"),  # style={"width": "100%", "margin": "auto"}),
         html.Div(id="results-container", children=[]),
         # line below is a hidden utility switch for chaining callbacks
         # if user presents valid kinase list for diffusion, the switch
@@ -247,7 +341,7 @@ app.layout = html.Div(
         dcc.RadioItems(
             id="diffusion-switch", value="invalid", style={"display": "none"}
         ),
-    ]
+    ],
 )
 
 
@@ -271,30 +365,47 @@ def create_results_div():
 )
 def check_validity(n_clicks, protein_list):
     """Validates protein list input."""
-    message = "Status: "
-    diffusion_switch = "invalid"
+    message = [html.H4("Experiment Result:")]
+    # diffusion switch, by default, is set to return no-update signal (ie: do nothing)
+    diffusion_switch = dash.no_update
     proteins = re.findall("\w+", protein_list)
 
     if len(proteins) == 0:
-        message = "You haven't entered anything in the textbox"
+        message.append(html.P("You haven't entered anything in the textbox"))
     else:
         valid_kinases = InputValidator().validate(proteins)
         invalid_kinases = [kinase for kinase in proteins if kinase not in valid_kinases]
         if len(valid_kinases) == 0:
-            message = """
-                None of the strings you entered were recognized as valid kinase ids.
-                The app expects HUGO (hgnc) symbols for human kinases.
-                See list here https://www.genenames.org/
-            """
-        if len(invalid_kinases) > 0:
-            message += (
-                "These items were not recognized as human kinases {strings}".format(
-                    strings=invalid_kinases
+            message.append(
+                html.P(
+                    """
+                    None of the strings you entered were recognized as valid kinase ids.
+                    The app expects HUGO (hgnc) symbols for human kinases.
+                    See list here https://www.genenames.org/
+                    """
                 )
             )
         if len(valid_kinases) > 0:
-            message += "Diffusing valid kinases {kinases}".format(kinases=valid_kinases)
+            message.append(
+                html.P(
+                    "Diffusing kinases {kinases}".format(
+                        kinases=", ".join(valid_kinases)
+                    )
+                )
+            )
             diffusion_switch = "valid"
+        if len(invalid_kinases) > 0:
+            message.append(
+                html.P(
+                    "These items were not recognized as human kinases: {kins}".format(
+                        kins=", ".join(invalid_kinases)
+                    )
+                )
+            )
+    print(message)
+    # wrap text in Markdown element before returning;
+    # block diffusion switch from updating (and triggering diffusion)
+    # if value of switch hasn't changed to "valid"
     return message, diffusion_switch
 
 
@@ -305,56 +416,26 @@ def check_validity(n_clicks, protein_list):
         Output("kin-map", "stylesheet"),  # 'stylesheet' is different from 'style'
     ],
     [Input("diffusion-switch", "value")],
-    [State("kinase-list", "value")],
+    [State("kinase-list", "value"), State("loo-switch", "value")],
     prevent_initial_call=True,
 )
-def diffuse(diffusion_switch, protein_list):
+def diffuse(diffusion_switch, protein_list, loo_switch):
+    """Conducts diffusion experiment with provided kinases."""
     proteins = re.findall("\w+", protein_list)
     valid_kinases = InputValidator().validate(proteins)
-
-    loo_switch = "off"
-
-    if loo_switch == "off":
-        print("hello")
-        zscore_table, graph_nodes, node_styling = get_diffusion_result(valid_kinases)
+    print("state of the diffusion switch:", diffusion_switch)
+    print("diffusion started.")
+    if "on" in loo_switch:
+        # averaged post-diffusion results produced via LOO validation
+        result_div, graph_nodes, node_styling = get_cross_validation_result(
+            valid_kinases
+        )
     else:
-        pass
-        # do LOO and average results
+        # plain diffusion, with no LOO validation and averaging
+        zscore_table, graph_nodes, node_styling = get_diffusion_result(valid_kinases)
+        result_div = [convert_to_dash_table(zscore_table)]
 
-    # create results container
-    # add table + figure, or just table to
-    return [convert_to_dash_table(zscore_table)], graph_nodes, node_styling
-
-    ## print(diffusion_result.head())
-    # fig = None
-    # if len(valid_labels) > 1 and "loo_true" in loo_switch:
-    #    print("loo true")
-    #    print(network)
-    #    loo_experiment = cross_validation.LOOValitation(network, valid_labels)
-    #    res = loo_experiment.run_validation()
-    #    tpr, fpr, auc = loo_experiment.get_roc()
-    #    fig = draw_roc_curve(tpr, fpr)
-    #    msg_ = """Leave-one-out cross-validation result: {loo_auc}""".format(
-    #        loo_auc=auc
-    #    )
-    #    msg += msg_
-    # return (
-    #    [
-    #        dash_table.DataTable(
-    #            id="hi",
-    #            columns=[{"name": i, "id": i} for i in diffusion_result.columns],
-    #            data=diffusion_result.to_dict("records"),
-    #            export_columns="all",
-    #            export_format="csv",
-    #            page_size=20,
-    #        )
-    #    ],
-    #    {"display": "flex", "justifyContent": "center"},
-    #    msg,
-    #    elements,
-    #    stylesheet,
-    #    fig,
-    # )
+    return result_div, graph_nodes, node_styling
 
 
 @app.callback(

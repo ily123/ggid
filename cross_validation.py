@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import scipy.stats
 import sklearn.metrics
 
 import diffusion
@@ -39,7 +40,9 @@ class LOOValitation:
         avg_result = self.average_results(score_vectors)
         avg_result = self.format_result_as_pd_df(avg_result, self.network.proteins)
         avg_result = self.replace_labels(avg_result, label_score)
-
+        avg_result["zscore"] = scipy.stats.zscore(avg_result.avg_label)
+        avg_result.sort_values(by="zscore", ascending=False, inplace=True)
+        print(avg_result)
         self.avg_result = avg_result
         return avg_result
 
@@ -61,7 +64,7 @@ class LOOValitation:
         Converts result vector into pandas data frame.
         """
 
-        return pd.DataFrame({"protein_name": proteins, "avg_label": avg_result})
+        return pd.DataFrame({"protein": proteins, "avg_label": avg_result})
 
     @staticmethod
     def replace_labels(avg_result, label_score):
@@ -71,8 +74,8 @@ class LOOValitation:
         print(label_score)
         avg_result["label"] = 0
         for protein, score in label_score.items():
-            avg_result.loc[avg_result.protein_name == protein, "avg_label"] = score
-            avg_result.loc[avg_result.protein_name == protein, "label"] = 1
+            avg_result.loc[avg_result.protein == protein, "avg_label"] = score
+            avg_result.loc[avg_result.protein == protein, "label"] = 1
         return avg_result
 
     def get_roc(self):
