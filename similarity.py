@@ -42,8 +42,6 @@ class SimilarityCalculator:
         """Removes proteins with low number of annotations."""
 
         print(min_annotations)
-        if "TP53" in self.proteins:
-            print("True")
         self.proteins = [
             p for p in self.proteins if len(self.annotations2[p]) >= min_annotations
         ]

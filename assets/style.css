@@ -1,4 +1,19 @@
 #main-container {
-    width: 75%;
-    margin: auto;
+    width: 85%;
+    padding: 1%;
+}
+
+#network-layout-toggle
+  .custom-control-input:checked
+  ~ .custom-control-label::before {
+  background-color: #343a40;
+  border-color: #343a40;
+}
+
+#header {}
+#content {
+    min-height: calc(100vh - 5rem);
+}
+#footer {
+    height: 5rem;
 }

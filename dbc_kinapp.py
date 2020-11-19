@@ -3,6 +3,7 @@ import re
 import time
 
 import dash
+import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_cytoscape as cyto
 import dash_html_components as html
@@ -39,6 +40,7 @@ def get_diffusion_result(labeled_kinases):
     graph_nodes, node_styling = create_cytoscape_div(
         network, labeled_kinases, zscore_table
     )
+
     return zscore_table, graph_nodes, node_styling
 
 
@@ -253,11 +255,11 @@ def get_colors(diffusion_result):
 
 
 def get_main_tab():
-    """Returns body of the main tool tab."""
+    """Returns main tab content."""
 
     return [
         html.Div(
-            dcc.Textarea(
+            dbc.Textarea(
                 id="kinase-list",
                 placeholder="Enter kinase IDs in HUGO format (ex: CDC7, AURAB)",
                 style={"margin": "auto", "width": "75%", "height": "20%"},
@@ -266,15 +268,15 @@ def get_main_tab():
             style={
                 "display": "flex",
                 "justifyContent": "center",
-                "padding": "100px 0px 0px 0px",
+                "padding": "50px 0px 0px 0px",
             },
         ),
         html.Div(
-            html.Button("SUBMIT", id="submit-button", n_clicks=None),
-            style={"display": "flex", "justifyContent": "center"},
+            dbc.Button("SUBMIT", id="submit-button", color="dark", n_clicks=None),
+            style={"display": "flex", "justifyContent": "center", "padding-top": "5px"},
         ),
         html.Div(
-            dcc.Checklist(
+            dbc.Checklist(
                 id="loo-switch",
                 options=[
                     {
@@ -286,43 +288,42 @@ def get_main_tab():
             ),
             style={"display": "flex", "justifyContent": "center"},
         ),
-        dcc.RadioItems(
-            id="network-layout",
-            options=[
-                {"label": "Circle", "value": "circle"},
-                {"label": "Concentric", "value": "concentric"},
-                {"label": "Spread", "value": "spread"},
-                {"label": "Force-directed", "value": "cola"},
-                # leaving layouts below, so I don't have to look
-                # up docs again if I need extra layouts
-                # {"label": "Cose", "value": "cose"},
-                # {"label": "Cose-Bilkenet", "value": "cose-bilkent"},
-                # {"label": "Euler", "value": "euler"},
-                # {"label": "Klay", "value": "klay"},
-                # {"label": "Dagre", "value": "dagre"},
-            ],
-            value="circle",
-            style={
-                "display": "flex",
-                "margin": "auto",
-            },
+        dbc.FormGroup(
+            [
+                dbc.Label("Graph layout"),
+                dbc.RadioItems(
+                    id="network-layout-toggle",
+                    options=[
+                        {"label": "Circle", "value": "circle"},
+                        {"label": "Concentric", "value": "concentric"},
+                        {"label": "Spread", "value": "spread"},
+                        {"label": "Force-directed", "value": "cola"},
+                    ],
+                    value="circle",
+                    inline=True,
+                ),
+            ]
         ),
         html.Div(
             id="kin-map-container",
             children=[
+                # dbc package broke zoom and panning, so I had to use
+                # raw pixels to set size of network area, and
+                # specify pan and zoom manually -- not a fan!
                 cyto.Cytoscape(
                     id="kin-map",
-                    layout={"name": "circle"},
+                    layout={"name": "circle", "fit": True},
                     style={
                         "height": "600px",
-                        "width": "100%",
+                        "width": "1000px",
                         "border": "1px solid grey",
-                        "justifyContent": "center",
                     },
+                    zoom=0.1,
                     elements=make_nodes(network),
+                    pan={"x": 500, "y": 300},
                 ),
             ],
-            style={"justifyContent": "center", "display": "flex"},
+            # style={"justifyContent": "center", "display": "flex"},
         ),
         html.Div(id="status-line"),  # style={"width": "100%", "margin": "auto"}),
         html.Div(id="results-container", children=[]),
@@ -335,27 +336,14 @@ def get_main_tab():
     ]
 
 
-app = dash.Dash(
-    __name__, external_stylesheets=["https://codepen.io/chriddyp/pen/bWLwgP.css"]
-)
-app.title = "GGid"
+def get_theory_tab():
+    """Returns content of theory tab."""
+    return "This is the theory tab."
 
-tab_main = dcc.Tab(label="Diffusion Tool", children=[])
-tab_theory = dcc.Tab(label="How it works", children=[])
-tab_example = dcc.Tab(label="Example", children=[])
 
-tab_main.children = get_main_tab()
-app.layout = html.Div(
-    id="main-container",
-    children=[
-        html.H1("GGID: Human Kinome"),
-        html.P(
-            "Diffuse information over Gene Ontology-derived network of human kinases."
-        ),
-        dcc.Tabs(children=[tab_main, tab_theory, tab_example]),
-        html.Footer("footer"),
-    ],
-)
+def get_example_tab():
+    """Returns contents of the example tab."""
+    return "This is the example tab."
 
 
 def parse_input(text):
@@ -367,6 +355,54 @@ def create_results_div():
     pass
 
 
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app.title = "GGid"
+
+tab_main = dbc.Tab(label="Diffusion Tool", children=[])
+tab_theory = dbc.Tab(label="How it works", children=[])
+tab_example = dbc.Tab(label="Example", children=[])
+
+tab_main.children = get_main_tab()
+tab_theory.children = get_theory_tab()
+tab_example.children = get_example_tab()
+
+app.layout = dbc.Container(
+    id="main-container",
+    children=[
+        dbc.CardHeader(
+            html.H1([dbc.Badge("GGID: Human Kinome", color="dark")]),
+            style={"background-color": "#343a40"},
+        ),
+        html.Br(),
+        dbc.Container(
+            id="content",
+            children=[
+                html.P(
+                    "Diffuse information over Gene Ontology-derived network of human kinases."
+                ),
+                dbc.Tabs(children=[tab_main, tab_theory, tab_example]),
+            ],
+        ),
+        html.Br(),
+        html.Br(),
+        dbc.CardFooter(
+            id="footer",
+            children=[
+                html.P(
+                    "Ilya Novikov 2020 // github: BLAH BLAH",
+                    style={
+                        "text-align": "center",
+                        "color": "white",
+                        "padding-top": "1rem",
+                    },
+                )
+            ],
+            style={"background-color": "#343a40"},
+        ),
+    ],
+)
+
+
 @app.callback(
     [
         Output("status-line", "children"),
@@ -376,44 +412,49 @@ def create_results_div():
     [State("kinase-list", "value")],
     prevent_initial_call=True,
 )
-def check_validity(n_clicks, protein_list):
-    """Validates protein list input."""
-    message = [html.H4("Experiment Result:")]
+def validate_inputs(n_clicks, protein_list):
+    """Validates protein list submitted by user."""
+    message = []  # html.H4("Experiment Result:")]
     # diffusion switch, by default, is set to return no-update signal (ie: do nothing)
     diffusion_switch = dash.no_update
     proteins = re.findall("\w+", protein_list)
 
     if len(proteins) == 0:
-        message.append(html.P("You haven't entered anything in the textbox"))
+        message.append(
+            dbc.Alert("You haven't entered anything in the textbox", color="danger")
+        )
     else:
         valid_kinases = InputValidator().validate(proteins)
         invalid_kinases = [kinase for kinase in proteins if kinase not in valid_kinases]
         if len(valid_kinases) == 0:
             message.append(
-                html.P(
+                dbc.Alert(
                     """
                     None of the strings you entered were recognized as valid kinase ids.
                     The app expects HUGO (hgnc) symbols for human kinases.
                     See list here https://www.genenames.org/
-                    """
+                    """,
+                    color="danger",
                 )
             )
         if len(valid_kinases) > 0:
             message.append(
-                html.P(
+                dbc.Alert(
                     "Diffusing kinases {kinases}".format(
                         kinases=", ".join(valid_kinases)
-                    )
+                    ),
+                    color="success",
                 )
             )
             diffusion_switch = "valid"
         if len(invalid_kinases) > 0:
             message.append(
-                html.P(
+                dbc.Alert(
                     "These items were not recognized as human kinases: {kins}".format(
                         kins=", ".join(invalid_kinases)
-                    )
-                )
+                    ),
+                    color="dark",
+                ),
             )
     print(message)
     # wrap text in Markdown element before returning;
@@ -453,7 +494,7 @@ def diffuse(diffusion_switch, protein_list, loo_switch):
 
 @app.callback(
     Output("kin-map", "layout"),
-    Input("network-layout", "value"),
+    Input("network-layout-toggle", "value"),
 )
 def change_graph_layout(layout_type):
     """Changes layout of the network graph."""
