@@ -1,6 +1,6 @@
 #main-container {
     width: 85%;
-    padding: 1%;
+    padding: 0%;
 }
 
 #network-layout-toggle
@@ -12,7 +12,7 @@
 
 #header {}
 #content {
-    min-height: calc(100vh - 5rem);
+    min-height: calc(90vh - 5rem);
 }
 #footer {
     height: 5rem;
