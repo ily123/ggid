@@ -189,7 +189,7 @@ def make_nodes2(sim_matrix, labels, proteins=[]):
 
 def create_cytoscape_div(sim_matrix, labels, diffusion_result):
     """Constructs updated cytoscape div."""
-    top_hits = diffusion_result[diffusion_result.zscore >= 1]
+    top_hits = diffusion_result[diffusion_result.zscore >= 2]
     top_hits = list(top_hits.protein.values)
     elements = make_nodes2(sim_matrix, labels, top_hits)
     new_elements = elements
@@ -243,12 +243,14 @@ def make_selectors_colors(colors):
 
 
 def get_colors(diffusion_result):
-    mask = diffusion_result.zscore >= 1
+    mask = diffusion_result.zscore >= 2
     diffusion_result = diffusion_result.loc[mask, :]
     xcolor_gradient = color_gradient.ColorGradientGenerator()
-    xcolor_gradient.create_color_map2(base_color=[128, 128, 128])
-    # xcolor_gradient.create_color_map(palette='Greens')
-    colors = xcolor_gradient.map_colors(diffusion_result.zscore)
+    xcolor_gradient.create_color_map2(base_color=[255, 51, 51])
+    print(diffusion_result["rank"])
+    colors = xcolor_gradient.map_colors(
+        1 - diffusion_result["rank"] / len(diffusion_result)
+    )
     color_dict = dict(zip(diffusion_result.protein, colors))
     # print(color_dict)
     return color_dict
@@ -488,7 +490,8 @@ app.layout = dbc.Container(
             id="content",
             children=[
                 html.P(
-                    "Diffuse information over Gene Ontology-derived network of human kinases."
+                    """Find clusters of connected kinases by diffusing information over
+                    GO term network of the human kinome."""
                 ),
                 dbc.Tabs(children=[tab_main, tab_example, tab_theory]),
             ],
@@ -566,7 +569,6 @@ def validate_inputs(n_clicks, protein_list):
                     color="dark",
                 ),
             )
-    print(message)
     # wrap text in Markdown element before returning;
     # block diffusion switch from updating (and triggering diffusion)
     # if value of switch hasn't changed to "valid"
@@ -587,8 +589,6 @@ def diffuse(diffusion_switch, protein_list, loo_switch):
     """Conducts diffusion experiment with provided kinases."""
     proteins = re.findall("\w+", protein_list)
     valid_kinases = InputValidator().validate(proteins)
-    print("state of the diffusion switch:", diffusion_switch)
-    print("diffusion started.")
     if "on" in loo_switch:
         # averaged post-diffusion results produced via LOO validation
         result_div, graph_nodes, node_styling = get_cross_validation_result(
@@ -599,6 +599,19 @@ def diffuse(diffusion_switch, protein_list, loo_switch):
         zscore_table, graph_nodes, node_styling = get_diffusion_result(valid_kinases)
         result_div = [convert_to_dash_table(zscore_table)]
 
+    # add z-score explanation
+    result_div.insert(
+        0,
+        dbc.Alert(
+            """
+            Showing proteins with z-score >= 2 in the graph view.
+            See full results in table below.
+            Higher z-score indicates closer connectivity
+            of the protein to the input set.
+            """
+        ),
+    )
+    result_div.insert(1, html.H3(dbc.Badge("Diffusion Result:", color="secondary")))
     return result_div, graph_nodes, node_styling
 
 
@@ -608,7 +621,6 @@ def diffuse(diffusion_switch, protein_list, loo_switch):
 )
 def change_graph_layout(layout_type):
     """Changes layout of the network graph."""
-    print("network layout radio item executed", time.time())
     layout = {"name": layout_type}
     return layout
 

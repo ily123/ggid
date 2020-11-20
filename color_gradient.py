@@ -1,32 +1,35 @@
-"""This module generates a color gradient."""
+"""Generates color gradient for nodes based on diffusion z-score."""
+
+
 import matplotlib.cm
 import matplotlib.colors
 import numpy as np
 
+
 class ColorGradientGenerator:
     """Generates color gradient."""
 
-    def __init__(self, lower_bound = 0, upper_bound = 10):
+    def __init__(self, lower_bound=0, upper_bound=10):
         """Inits class with lower and upper bound for gradient."""
 
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
 
-    def create_color_map(self, palette = 'Blues'):
+    def create_color_map(self, palette="Blues"):
         """Sets colormap."""
 
         num_bins = 10
         color_map = matplotlib.cm.get_cmap(palette, num_bins)
         self.scalar_map = matplotlib.cm.ScalarMappable(cmap=color_map)
 
-    def create_color_map2(self, base_color = None):
+    def create_color_map2(self, base_color=None):
         if not base_color:
-            base_color = [255, 0, 0] # red
+            base_color = [255, 0, 0]  # red
         N = 256
         vals = np.ones((N, 4))
-        vals[:, 0] = np.linspace(1, base_color[0]/256, N)
-        vals[:, 1] = np.linspace(1, base_color[1]/256, N)
-        vals[:, 2] = np.linspace(1, base_color[2]/256, N)
+        vals[:, 0] = np.linspace(1, base_color[0] / 256, N)
+        vals[:, 1] = np.linspace(1, base_color[1] / 256, N)
+        vals[:, 2] = np.linspace(1, base_color[2] / 256, N)
         color_map = matplotlib.colors.ListedColormap(vals)
         self.scalar_map = matplotlib.cm.ScalarMappable(cmap=color_map)
 
