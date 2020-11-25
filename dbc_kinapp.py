@@ -30,21 +30,21 @@ image_url = "url(https://image.freepik.com/free-photo/elegant-black-handmade-tec
 network = pickle.load(open("network/kinase_matrix.pkl", "rb"))
 
 
-def get_diffusion_result(labeled_kinases):
-    """Returns formatted diffusion results."""
+def get_diffusion_result(labeled_kinases, zscore_cutoff):
+    """Returns container with formatted diffusion results."""
     experiment = diffusion.Diffusion(network, labeled_kinases)
     result = experiment.diffuse()
     # make z-score table
     zscore_table = result.get_as_pandas_df_without_labels()
     # make updated graph
     graph_nodes, node_styling = create_cytoscape_div(
-        network, labeled_kinases, zscore_table
+        network, labeled_kinases, zscore_table, zscore_cutoff
     )
 
     return zscore_table, graph_nodes, node_styling
 
 
-def get_cross_validation_result(labeled_kinases):
+def get_cross_validation_result(labeled_kinases, zscore_cutoff):
     """Does LOO validation and returns container with formatted results."""
     loo_experiment = cross_validation.LOOValitation(network, labeled_kinases)
     zscore_table = loo_experiment.run_validation()
@@ -109,7 +109,7 @@ def get_cross_validation_result(labeled_kinases):
     )
     # make updated graph
     graph_nodes, node_styling = create_cytoscape_div(
-        network, labeled_kinases, zscore_table
+        network, labeled_kinases, zscore_table, zscore_cutoff
     )
     return result_div, graph_nodes, node_styling
 
@@ -187,13 +187,13 @@ def make_nodes2(sim_matrix, labels, proteins=[]):
     return elements
 
 
-def create_cytoscape_div(sim_matrix, labels, diffusion_result):
+def create_cytoscape_div(sim_matrix, labels, diffusion_result, zscore_cutoff):
     """Constructs updated cytoscape div."""
-    top_hits = diffusion_result[diffusion_result.zscore >= 2]
-    top_hits = list(top_hits.protein.values)
-    elements = make_nodes2(sim_matrix, labels, top_hits)
+    top_hits = diffusion_result[diffusion_result.zscore >= zscore_cutoff]
+    top_hits_nodes = list(top_hits.protein.values)
+    elements = make_nodes2(sim_matrix, labels, top_hits_nodes)
     new_elements = elements
-    new_style = get_cyto_stylesheet(diffusion_result)
+    new_style = get_cyto_stylesheet(top_hits)
     return new_elements, new_style
 
 
@@ -213,20 +213,10 @@ def get_cyto_stylesheet(diffusion_result):
         {
             "selector": "[label_flag=0]",
             "style": {"border-width": "1", "border-color": "black"},
-        }
-        # {
-        #    'selector':'[label_flag=0]',
-        #    'style':{'background-color':'MediumPurple'}#'rgba(135, 206, 250, 0.5)'}#'gray'}#08306b'}
-        # },
-        # {
-        #    'selector':'[label_flag=0]',
-        #    'style':{'shape':'triangle'}#'rgba(135, 206, 250, 0.5)'}#'gray'}#08306b'}
-        # }
+        },
     ]
-    # print(diffusion_result.zscore)
     colors = get_colors(diffusion_result)
     color_selectors = make_selectors_colors(colors)
-    # print(color_selectors)
     return stylesheet + color_selectors
 
 
@@ -243,8 +233,7 @@ def make_selectors_colors(colors):
 
 
 def get_colors(diffusion_result):
-    mask = diffusion_result.zscore >= 2
-    diffusion_result = diffusion_result.loc[mask, :]
+    """Generate color gradient for displayed nodes."""
     xcolor_gradient = color_gradient.ColorGradientGenerator()
     xcolor_gradient.create_color_map2(base_color=[255, 51, 51])
     print(diffusion_result["rank"])
@@ -252,7 +241,6 @@ def get_colors(diffusion_result):
         1 - diffusion_result["rank"] / len(diffusion_result)
     )
     color_dict = dict(zip(diffusion_result.protein, colors))
-    # print(color_dict)
     return color_dict
 
 
@@ -278,16 +266,19 @@ def get_main_tab():
             style={"display": "flex", "justifyContent": "center", "padding-top": "5px"},
         ),
         html.Div(
-            dbc.Checklist(
-                id="loo-switch",
-                options=[
-                    {
-                        "label": "cross-validate (for 2+ kinases)",
-                        "value": "on",
-                    }
-                ],
-                value=[],  # when you click checkmark its value is added to this list
-            ),
+            children=[
+                dbc.Checklist(
+                    id="loo-switch",
+                    options=[
+                        {
+                            "label": "cross-validate (for 2+ kinases)",
+                            "value": "on",
+                        }
+                    ],
+                    value=[],  # when you click checkmark its value is added to this list
+                ),
+                dbc.Input(id="zscore-cutoff", value=2, type="number"),
+            ],
             style={"display": "flex", "justifyContent": "center"},
         ),
         html.Div(
@@ -582,21 +573,27 @@ def validate_inputs(n_clicks, protein_list):
         Output("kin-map", "stylesheet"),  # 'stylesheet' is different from 'style'
     ],
     [Input("diffusion-switch", "value")],
-    [State("kinase-list", "value"), State("loo-switch", "value")],
+    [
+        State("kinase-list", "value"),
+        State("loo-switch", "value"),
+        State("zscore-cutoff", "value"),
+    ],
     prevent_initial_call=True,
 )
-def diffuse(diffusion_switch, protein_list, loo_switch):
+def diffuse(diffusion_switch, protein_list, loo_switch, zscore_cutoff):
     """Conducts diffusion experiment with provided kinases."""
     proteins = re.findall("\w+", protein_list)
     valid_kinases = InputValidator().validate(proteins)
     if "on" in loo_switch:
         # averaged post-diffusion results produced via LOO validation
         result_div, graph_nodes, node_styling = get_cross_validation_result(
-            valid_kinases
+            valid_kinases, zscore_cutoff
         )
     else:
         # plain diffusion, with no LOO validation and averaging
-        zscore_table, graph_nodes, node_styling = get_diffusion_result(valid_kinases)
+        zscore_table, graph_nodes, node_styling = get_diffusion_result(
+            valid_kinases, zscore_cutoff
+        )
         result_div = [convert_to_dash_table(zscore_table)]
 
     # add z-score explanation
