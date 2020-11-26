@@ -15,19 +15,20 @@ from dash.dependencies import Input, Output, State
 from dash_table.Format import Format, Scheme, Sign, Symbol
 from scipy import sparse
 
+import app_text
 import color_gradient
 import cross_validation
 import diffusion
 from kinapp_helper import InputValidator
 
-pd.options.display.float_format = "${:,.2f}".format
-
+# laod data and set some defaults:
+network = pickle.load(open("network/kinase_matrix.pkl", "rb"))
+pd.options.display.float_format = "{:,.2f}".format
 cyto.load_extra_layouts()
 
-image_url = "url(https://image.freepik.com/free-photo/elegant-black-handmade-technique-aquarelle_23-2148300751.jpg)"
 
-# network as a coo matrix
-network = pickle.load(open("network/kinase_matrix.pkl", "rb"))
+# ---
+# diffusion and cytoscape logic:
 
 
 def get_diffusion_result(labeled_kinases, zscore_cutoff):
@@ -48,6 +49,7 @@ def get_cross_validation_result(labeled_kinases, zscore_cutoff):
     """Does LOO validation and returns container with formatted results."""
     loo_experiment = cross_validation.LOOValitation(network, labeled_kinases)
     zscore_table = loo_experiment.run_validation()
+    print(zscore_table)
     # get ROC figure
     tpr, fpr, auc = loo_experiment.get_roc()
     fig = draw_roc_curve(tpr, fpr)
@@ -57,48 +59,14 @@ def get_cross_validation_result(labeled_kinases, zscore_cutoff):
             html.Details(
                 children=[
                     html.Summary(
-                        "Cross-validation AUC is %1.2f (expand for details)" % auc
+                        "Cross-validation AUC is %1.2f (expand for details)" % auc,
+                        style={"font-weight": "bold"},
                     ),
                     html.Ul(
                         children=[
-                            html.Li(
-                                """
-                                AUC ~= 0.50: information does not diffuse between the
-                                given kinases.
-                                This is because the kinases are not closely connected in
-                                the network.
-                                Either the network is not modeling their
-                                relationship properly, or these kinases are not
-                                very similar (i.e. do not share low-level GO terms).
-                                You should diffuse each kinase on its own
-                                to find its functional neighbors.
-                                """
-                            ),
-                            html.Li(
-                                """
-                                0.60 < AUC < 0.80: there is some signal! The kinases in
-                                the set diffuse some information to each other,
-                                meaning they are somewhat connected in the network.
-
-                                Alternatively, there could
-                                be two independent kinase clusters of in your set.
-                                Kinases within the same cluster are predictive of each
-                                other, but not of the kinases in the other cluster.
-                                Each cluster may be responsible for some unique
-                                sub-function relevant to the overall process.
-                                Identify the clusters by looking at the graph visual
-                                above, and diffuse each cluster on its own to find
-                                its functional neighbors.
-                                """
-                            ),
-                            html.Li(
-                                """
-                                AUC > 0.80: kinases are strongly predictive of each
-                                other. They are well connected in the network, and thier
-                                neighbors may be involved in the same type of process.
-                                For the list of their closest neigbors see table below.
-                                """
-                            ),
+                            html.Li(app_text.auc_explanation["random"]),
+                            html.Li(app_text.auc_explanation["moderate"]),
+                            html.Li(app_text.auc_explanation["high"]),
                         ]
                     ),
                     dcc.Graph(id="loo-roc", figure=fig),
@@ -138,70 +106,81 @@ def draw_roc_curve(tpr, fpr):
     return fig
 
 
-def make_nodes(network):
-    """
-    Constructs cytoscape elements (node) dict from COO matrix
-    """
+def get_network_elements(network):
+    """Constructs cytoscape view of the entire network."""
+    # add all proteins and their edges to the view
     elements = []
-    node_i, node_j = network.adj_matrix.nonzero()
-    track = []
-    for index, label_i in enumerate(node_i):
-        label_j = node_j[index]
-        if label_i not in track:
-            elements.append({"data": {"id": label_i, "label": label_i}})
-            track.append(label_i)
-        if label_j not in track:
-            elements.append({"data": {"id": label_j, "label": label_j}})
-            track.append(label_j)
-        elements.append({"data": {"source": label_i, "target": label_j}})
-    # print(len(elements))
+    protein_name = network.proteins
+    nodes_i, nodes_j = network.adj_matrix.nonzero()
+    # iterate over all edges
+    for index, node_i_index in enumerate(nodes_i):
+        node_j_index = nodes_j[index]
+        # get protein names that make up the edge
+        node_i_name = protein_name[node_i_index]
+        node_j_name = protein_name[node_j_index]
+        # construct cytoscape elements
+        element_i = {"data": {"id": node_i_name, "label": node_i_name}}
+        element_j = {"data": {"id": node_j_name, "label": node_j_name}}
+        edge_ij = {"data": {"source": node_i_name, "target": node_j_name}}
+        edge_ji = {"data": {"source": node_j_name, "target": node_i_name}}
+        # the matrix is symmetrical, so we need to account for redundant edges
+        if element_i not in elements:
+            elements.append(element_i)
+        if element_j not in elements:
+            elements.append(element_j)
+        if (edge_ij not in elements) and (edge_ji not in elements):
+            elements.append(edge_ij)
     return elements
 
 
-def make_nodes2(sim_matrix, labels, proteins=[]):
-    """
-    Constructs cytoscape elements (node) dict from COO matrix
-
-    {'data':{'id': label_i, 'label': label_i}}
-    {'data':{'source': label_i, 'target': label_j}}
-    """
-
+def get_cluster_elements(network, input_proteins, top_hits):
+    """Constructs cytoscape view for the post-diffusion result."""
+    # The goal is to make a graph view of the input proteins and
+    # their most closely connected post-diffusion hits. (Together,
+    # these form a cluster.) We only want to display the cluster
+    # proteins and the connections they form to each other.
     elements = []
-    node_added = []
-    for label in labels + proteins:
-        edges = sim_matrix.get_edges_for_protein(label)
-        for edge in edges:
-            if edge not in proteins + labels:
-                continue
-            edge_notation = {"data": {"source": label, "target": edge}}
-            elements.append(edge_notation)
-        # node_added += [node for node in [label] + edges if node not in node_added]
-    node_added = labels + proteins
-    for node in node_added:
-        islabel = 0
-        if node in labels:
-            islabel = 1
-            # print(node)
-        elements.append({"data": {"id": node, "label": node, "label_flag": islabel}})
-
+    cluster = input_proteins + top_hits
+    # find connections within cluster
+    for protein in cluster:
+        edges = network.get_edges_for_protein(protein)
+        cluster_edges = [edge for edge in edges if edge in cluster]
+        for edge in cluster_edges:
+            edge_ij = {"data": {"source": protein, "target": edge}}
+            edge_ji = {
+                "data": {"source": edge, "target": protein}
+            }  # no redundant edges
+            if (edge_ij not in elements) and (edge_ji not in elements):
+                elements.append(edge_ij)
+    # now add nodes to the view, and flag the input proteins (for formatting later)
+    for node in cluster:
+        isinput = 0
+        if node in input_proteins:
+            isinput = 1
+        node_notation = {
+            "data": {"id": node, "label": node, "input_label_flag": isinput}
+        }
+        elements.append(node_notation)
     return elements
 
 
-def create_cytoscape_div(sim_matrix, labels, diffusion_result, zscore_cutoff):
+def create_cytoscape_div(network, labels, diffusion_result, zscore_cutoff):
     """Constructs updated cytoscape div."""
     top_hits = diffusion_result[diffusion_result.zscore >= zscore_cutoff]
     top_hits_nodes = list(top_hits.protein.values)
-    elements = make_nodes2(sim_matrix, labels, top_hits_nodes)
+    elements = get_cluster_elements(network, labels, top_hits_nodes)
     new_elements = elements
     new_style = get_cyto_stylesheet(top_hits)
     return new_elements, new_style
 
 
 def get_cyto_stylesheet(diffusion_result):
+    """Style nodes according to post-diffusion results."""
+    # mark input proteins with a diamond
     stylesheet = [
         {"selector": "node", "style": {"label": "data(label)"}},
         {
-            "selector": "[label_flag=1]",
+            "selector": "[input_label_flag=1]",
             "style": {
                 "shape": "diamond",
                 "background-color": "red",
@@ -211,19 +190,20 @@ def get_cyto_stylesheet(diffusion_result):
             },
         },
         {
-            "selector": "[label_flag=0]",
+            "selector": "[input_label_flag=0]",
             "style": {"border-width": "1", "border-color": "black"},
         },
     ]
-    colors = get_colors(diffusion_result)
-    color_selectors = make_selectors_colors(colors)
+    # color nodes according to their post-diffusion z-score
+    protein_colors = get_colors(diffusion_result)
+    color_selectors = make_selector_colors(protein_colors)
     return stylesheet + color_selectors
 
 
-def make_selectors_colors(colors):
-
+def make_selector_colors(protein_colors):
+    """Color proteins according to their post-diffusion z-score."""
     selectors = []
-    for protein, color in colors.items():
+    for protein, color in protein_colors.items():
         selector = {
             "selector": '[label="%s"]' % protein,
             "style": {"background-color": color},
@@ -246,7 +226,6 @@ def get_colors(diffusion_result):
 
 def get_main_tab():
     """Returns main tab content."""
-
     return [
         html.Div(
             dbc.Textarea(
@@ -281,6 +260,9 @@ def get_main_tab():
             ],
             style={"display": "flex", "justifyContent": "center"},
         ),
+        html.Br(),
+        html.Div(id="status-line"),
+        html.Br(),
         html.Div(
             id="kin-map-container",
             children=[
@@ -312,7 +294,7 @@ def get_main_tab():
                         "border": "1px solid grey",
                     },
                     zoom=0.1,
-                    elements=make_nodes(network),
+                    elements=get_network_elements(network),
                     pan={"x": 500, "y": 300},
                 ),
             ],
@@ -322,7 +304,6 @@ def get_main_tab():
                 "align-content": "center",
             },
         ),
-        html.Div(id="status-line"),  # style={"width": "100%", "margin": "auto"}),
         html.Div(id="results-container", children=[]),
         # line below is a hidden utility switch for chaining callbacks
         # if user presents valid kinase list for diffusion, the switch
@@ -335,111 +316,7 @@ def get_main_tab():
 
 def get_theory_tab():
     """Returns content of theory tab."""
-
-    content = [
-        dcc.Markdown(
-            """
-    ### The problem
-    ---
-    Proteins don't work in isolation. They form networks and work in tandem.
-
-    This means that once you've identified
-    a protein associated with some process (ex: a disease), you can query that
-    protein's network to find additional proteins that are involved.
-    Once you understand the network and the role of all relevant protein players,
-    you can design effective theurapeutics.
-
-    Construction of such networks, and learning from them, is one of the
-    subfields in computational biology. The industry standard for collecting and
-    visualizing these data is the [STRING](https://string-db.org/) database. There
-    you can find all sorts of protein networks build on top of various data (physical
-    interactions, co-expression of proteins, co-expression of protein mRNA, etc).
-
-    ### GO term similarity network
-    ---
-
-    In this dashboard, I created a novel way of presenting another type of
-    information: GO terms. GO terms come from the [Gene Ontology](http://geneontology.org/)
-    database. They are tags assigned to proteins in order to describe proteins job within the cell (very similar to how
-    IMDB assigns tags to movies). Proteins that do similar jobs have similar GO terms. We can build a network from that!
-
-    To build a network, we compare proteins to each other, in an all-vs-all manner, to
-    produce a similarity matrix that show how similar any pair of proteins are. We then
-    reduce the similarity matrix to a graph (network) by dropping out connections
-    that are weak (ie the two proteins are not similar). What we end up with is a network.
-
-    The circle pic you see loaded in the first tab is the GO term network for 350 human
-    kinases, build exactly like I described. (For those who want the nitty gritty details:
-    similarity between two proteins was measured using Resnik similarity, the network
-    was constructed by dropping out all edges outside of the top 10. The proteins, beforehand,
-    were sanitized by removing those with fewer than 10 annotations.)
-
-
-    ### Diffusion
-    ---
-
-    To extract information from this network, we can simply examine it by hand. Given a protein, what
-    are its closest neighbors? That works, but gets out of hand really quickly when you
-    want to look at more than just 1 protein. (Let's say you have 10 proteins involved
-    in some disease, and you want to see all of their neighbors.)
-
-    To help us, there are a bunch of algorithms that
-    simplify the process of finding neighors within networks. The one I am using
-    is called Information Diffusion. It was originally developed in the 1990s to
-    model diffusion of heat through metal, but has since been deployed to protein
-    networks as well.
-
-    The "heat" in our case is information (a binary label: 1 if a protein does X, and 0 otherwise).
-    We diffuse the label over the network of proteins. Post-diffusion, the proteins
-    that have the highest label content are the ones most closely connected to the
-    source.
-
-    ### Kinases
-    ---
-
-    Ok, that's all great. But this app only includes a network of kinases.
-    why did you build a kinase network specifically?
-
-    I chose kinases for this demo app for technical reasons:
-
-    * I wasn't sure the browser can render a full network of 20,000 human proteins
-    * Meanwhile, the number of kinases is realtively small (just 500),
-    so they are easy to model
-    * Plus, kinases are very important in human disease (they drive signaling
-    by phosphorylating other proteins), and as a result well-studied and annotated
-
-    You can apply the framework described here to the entire human proteome (or other actors
-    like RNAs).
-
-
-    ### Does this tool actually work for predicting novel associations?
-    ---
-
-    This tool is good at presenting networks of existing information (ie cross-validation
-    is pretty decent >= 0.80). That being said, prediction of future interactions
-    from present data is pretty iffy (retrospective auc ~0.6-0.7). I am not showing any data here,
-    just recalling the experimental results from the waning days of my training.
-    I think some of it is in my thesis.
-
-    As to why this model doesn't generalize well (i.e. it overtrains)  - I think this is
-    because of the binary nature of GO term annotations. If two proteins are found
-    to be associated, but their GO terms are completely different before the discovery
-    is made, the model isn't going to be aware the relationship. The model predicts two proteins
-    that already share GO terms as functionally related. If there is no similarit to
-    cease on, the model simily won't create an edge in th network.
-
-    ALL THIS NEEDS EDITING // FIRST DRAFT
-
-
-    **If the tool can't predict the future, wth did you make this dashboard??**
-
-    I wanted to write a network app. I have multiple ideas for using the
-    basic approach in other domains. And now I have an app for that. Just
-    have to change the underlying network and edit some text, and I am good to go!
-    """
-        )
-    ]
-
+    content = [dcc.Markdown(app_text.tabs["theory_tab"])]
     return content
 
 
@@ -452,22 +329,17 @@ def parse_input(text):
     re.findall("\w+", text)
 
 
-def create_results_div():
-    """Wraps diffusion results as children for the results-container."""
-    pass
+# ---
+# main app layout:
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
 app.title = "GGid"
 
-tab_main = dbc.Tab(label="Diffusion Tool", children=[])
-tab_theory = dbc.Tab(label="Theory", children=[])
-tab_example = dbc.Tab(label="Example", children=[])
-
-tab_main.children = get_main_tab()
-tab_theory.children = get_theory_tab()
-tab_example.children = get_example_tab()
+tab_main = dbc.Tab(label="Diffusion Tool", children=get_main_tab())
+tab_theory = dbc.Tab(label="Theory", children=get_theory_tab())
+tab_example = dbc.Tab(label="Example", children=get_example_tab())
 
 app.layout = dbc.Container(
     id="main-container",
@@ -494,7 +366,7 @@ app.layout = dbc.Container(
             id="footer",
             children=[
                 html.P(
-                    "Ilya Novikov 2020 // github: BLAH BLAH",
+                    "Ilya Novikov 2020",
                     style={
                         "text-align": "center",
                         "color": "white",
@@ -508,6 +380,10 @@ app.layout = dbc.Container(
 )
 
 
+# ---
+# app callbacks:
+
+
 @app.callback(
     [
         Output("status-line", "children"),
@@ -519,7 +395,7 @@ app.layout = dbc.Container(
 )
 def validate_inputs(n_clicks, protein_list):
     """Validates protein list submitted by user."""
-    message = []  # html.H4("Experiment Result:")]
+    message = []
     # diffusion switch, by default, is set to return no-update signal (ie: do nothing)
     diffusion_switch = dash.no_update
     proteins = re.findall("\w+", protein_list)
@@ -528,6 +404,7 @@ def validate_inputs(n_clicks, protein_list):
         message.append(
             dbc.Alert("You haven't entered anything in the textbox", color="danger")
         )
+        return message, diffusion_switch
     else:
         valid_kinases = InputValidator().validate(proteins)
         invalid_kinases = [kinase for kinase in proteins if kinase not in valid_kinases]
@@ -542,12 +419,27 @@ def validate_inputs(n_clicks, protein_list):
                     color="danger",
                 )
             )
+            return message, diffusion_switch
         if len(valid_kinases) > 0:
             message.append(
                 dbc.Alert(
-                    "Diffusing kinases {kinases}".format(
-                        kinases=", ".join(valid_kinases)
-                    ),
+                    children=[
+                        html.P(
+                            """
+                            Diffusing kinases in the input set: {kinases}.
+                            See diffusion results (graph and z-score table) below.
+                            """.format(
+                                kinases=", ".join(valid_kinases)
+                            )
+                        ),
+                        html.P(
+                            """
+                            Higher z-score indicates closer connectivity of the protein
+                            to the input set. Only proteins with z-score > 2 are
+                            show in the graph view.
+                            """
+                        ),
+                    ],
                     color="success",
                 )
             )
@@ -555,16 +447,22 @@ def validate_inputs(n_clicks, protein_list):
         if len(invalid_kinases) > 0:
             message.append(
                 dbc.Alert(
-                    "These items were not recognized as human kinases: {kins}".format(
+                    "These items were not found in network: {kins}".format(
                         kins=", ".join(invalid_kinases)
                     ),
                     color="dark",
                 ),
             )
-    # wrap text in Markdown element before returning;
-    # block diffusion switch from updating (and triggering diffusion)
-    # if value of switch hasn't changed to "valid"
-    return message, diffusion_switch
+    # wrap alerts into a collapsible
+    message_wrap = html.Details(
+        children=[
+            html.Summary(
+                "Experiment summary (expand for details)", style={"font-weight": "bold"}
+            ),
+            html.Div(children=message),
+        ]
+    )
+    return message_wrap, diffusion_switch
 
 
 @app.callback(
@@ -598,18 +496,7 @@ def diffuse(diffusion_switch, protein_list, loo_switch, zscore_cutoff):
         result_div = [convert_to_dash_table(zscore_table)]
 
     # add z-score explanation
-    result_div.insert(
-        0,
-        dbc.Alert(
-            """
-            Showing proteins with z-score >= 2 in the graph view.
-            See full results in table below.
-            Higher z-score indicates closer connectivity
-            of the protein to the input set.
-            """
-        ),
-    )
-    result_div.insert(1, html.H3(dbc.Badge("Diffusion Result:", color="secondary")))
+    # result_div.insert(0, html.H3(dbc.Badge("Diffusion Result:", color="secondary")))
     return result_div, graph_nodes, node_styling
 
 
@@ -624,4 +511,4 @@ def change_graph_layout(layout_type):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=False)
+    app.run_server(debug=True)

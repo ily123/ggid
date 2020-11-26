@@ -23,13 +23,9 @@ class LOOValitation:
             raise ("need at least 2 labels for cross-validation")
 
     def run_validation(self):
-        """
-        Runs Leave-One-Out cross-validation.
-        """
-
+        """Runs Leave-One-Out cross-validation."""
         label_score = {}
         score_vectors = []
-        merged = None
         for left_out_label in self.labels:
             input_labels = [i for i in self.labels if i != left_out_label]
             dif = diffusion.Diffusion(self.network, input_labels)
@@ -41,6 +37,7 @@ class LOOValitation:
         avg_result = self.format_result_as_pd_df(avg_result, self.network.proteins)
         avg_result = self.replace_labels(avg_result, label_score)
         avg_result["zscore"] = scipy.stats.zscore(avg_result.avg_label)
+        avg_result["rank"] = avg_result.zscore.rank(ascending=False)
         avg_result.sort_values(by="zscore", ascending=False, inplace=True)
         print(avg_result)
         self.avg_result = avg_result
