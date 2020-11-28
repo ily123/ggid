@@ -49,10 +49,9 @@ def get_cross_validation_result(labeled_kinases, zscore_cutoff):
     """Does LOO validation and returns container with formatted results."""
     loo_experiment = cross_validation.LOOValitation(network, labeled_kinases)
     zscore_table = loo_experiment.run_validation()
-    print(zscore_table)
     # get ROC figure
     tpr, fpr, auc = loo_experiment.get_roc()
-    fig = draw_roc_curve(tpr, fpr)
+    roc_fig = draw_roc_curve(tpr, fpr, auc)
     # define results div
     result_div = html.Div(
         children=[
@@ -62,6 +61,7 @@ def get_cross_validation_result(labeled_kinases, zscore_cutoff):
                         "Cross-validation AUC is %1.2f (expand for details)" % auc,
                         style={"font-weight": "bold"},
                     ),
+                    dcc.Graph(id="loo-roc", figure=roc_fig),
                     html.Ul(
                         children=[
                             html.Li(app_text.auc_explanation["random"]),
@@ -69,7 +69,6 @@ def get_cross_validation_result(labeled_kinases, zscore_cutoff):
                             html.Li(app_text.auc_explanation["high"]),
                         ]
                     ),
-                    dcc.Graph(id="loo-roc", figure=fig),
                 ],
             ),
             convert_to_dash_table(zscore_table),
@@ -96,13 +95,35 @@ def convert_to_dash_table(zscore_table):
     return dash_table_
 
 
-def draw_roc_curve(tpr, fpr):
+def draw_roc_curve(tpr, fpr, auc):
     """Creates plotly scatter for the ROC curve."""
     fig = go.Figure()
-    trace = go.Scatter(x=fpr, y=tpr)
-    fig.add_trace(trace)
-    fig.update_layout(width=500, height=500)
-    fig.layout.title = "Leave-one-out cross-validation ROC"
+    loo_trace = go.Scatter(
+        x=fpr, y=tpr, mode="lines", line_color="red", name="input set (AUC=%1.2f)" % auc
+    )
+    random_trace = go.Scatter(
+        x=[0, 1],
+        y=[0, 1],
+        mode="lines",
+        line_color="gray",
+        line_dash="dot",
+        line_width=1,
+        name="random",
+    )
+    fig.add_traces([loo_trace, random_trace])
+    fig.update_layout(
+        width=500,
+        height=500,
+        legend_x=0.98,
+        legend_y=0.02,
+        legend_xanchor="right",
+        title="Leave-one-out cross-validation of the input proteins",
+        title_x=0.5,
+        xaxis_title="False Positive Rate",
+        yaxis_title="True Positive Rate",
+        xaxis_range=[-0.01, 1.01],
+        yaxis_range=[-0.01, 1.01],
+    )
     return fig
 
 
@@ -354,8 +375,8 @@ app.layout = dbc.Container(
             id="content",
             children=[
                 html.P(
-                    """Find clusters of connected kinases by diffusing information over
-                    GO term network of the human kinome."""
+                    """Find clusters of connected kinases in the
+                    GO network of the human kinome."""
                 ),
                 dbc.Tabs(children=[tab_main, tab_example, tab_theory]),
             ],
@@ -480,10 +501,10 @@ def validate_inputs(n_clicks, protein_list):
     prevent_initial_call=True,
 )
 def diffuse(diffusion_switch, protein_list, loo_switch, zscore_cutoff):
-    """Conducts diffusion experiment with provided kinases."""
+    """Conducts diffusion experiment with input kinases."""
     proteins = re.findall("\w+", protein_list)
     valid_kinases = InputValidator().validate(proteins)
-    if "on" in loo_switch:
+    if "on" in loo_switch and len(valid_kinases) >= 2:
         # averaged post-diffusion results produced via LOO validation
         result_div, graph_nodes, node_styling = get_cross_validation_result(
             valid_kinases, zscore_cutoff

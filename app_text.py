@@ -138,5 +138,19 @@ tabs = {
         I wanted to write a network app. I have multiple ideas for using the
         basic approach in other domains. And now I have an app for that. Just
         have to change the underlying network and edit some text, and I am good to go!
-    """
+        """,
+    "example": """
+        Let's say you'd like to study protein P53. It's central to several cancers,
+        and interacts with many kinases. You have a list of human kinases that
+        interact with P53, and you would like to know if there are any more.
+
+        Step 0: Find existing kinases by looking in the Phosposite database
+        Step 1: Enter these kinases in teh form
+        Step 3: Press diffuse
+
+        Recommended:
+
+        Step 4
+
+        """,
 }
