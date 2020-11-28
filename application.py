@@ -262,24 +262,45 @@ def get_main_tab():
             },
         ),
         html.Div(
-            dbc.Button("SUBMIT", id="submit-button", color="dark", n_clicks=None),
+            dbc.Button("DIFFUSE", id="submit-button", color="dark", n_clicks=None),
             style={"display": "flex", "justifyContent": "center", "padding-top": "5px"},
         ),
         html.Div(
-            children=[
-                dbc.Checklist(
-                    id="loo-switch",
-                    options=[
-                        {
-                            "label": "cross-validate (for 2+ kinases)",
-                            "value": "on",
-                        }
-                    ],
-                    value=[],  # when you click checkmark its value is added to this list
-                ),
-                dbc.Input(id="zscore-cutoff", value=2, type="number"),
-            ],
-            style={"display": "flex", "justifyContent": "center"},
+            dbc.Form(
+                [
+                    dbc.FormGroup(
+                        dbc.Checklist(
+                            id="loo-switch",
+                            options=[
+                                {
+                                    "label": "cross-validate (for 2+ kinases)",
+                                    "value": "on",
+                                }
+                            ],
+                            value=[],  # when you checkmark, value is added to this list
+                        ),
+                        className="mr-3",
+                    ),
+                    dbc.FormGroup(
+                        [
+                            dbc.Label("graph hits with zscore of >="),
+                            dbc.Input(
+                                id="zscore-cutoff",
+                                value=2,
+                                type="number",
+                                style={
+                                    "width": "70px",
+                                },
+                            ),
+                        ],
+                    ),
+                ],
+                inline=True,
+            ),
+            style={
+                "display": "flex",
+                "justifyContent": "center",
+            },
         ),
         html.Br(),
         html.Div(id="status-line"),
@@ -428,6 +449,7 @@ def validate_inputs(n_clicks, protein_list):
         return message, diffusion_switch
     else:
         valid_kinases = InputValidator().validate(proteins)
+        # valid_kinases = [vk for vk in valid_kinases if vk in network.proteins]
         invalid_kinases = [kinase for kinase in proteins if kinase not in valid_kinases]
         if len(valid_kinases) == 0:
             message.append(

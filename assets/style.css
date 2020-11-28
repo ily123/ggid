@@ -10,10 +10,10 @@
   border-color: #343a40;
 }
 
-#header {}
 #content {
     min-height: calc(90vh - 5rem);
 }
+
 #footer {
     height: 5rem;
 }
