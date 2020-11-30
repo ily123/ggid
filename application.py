@@ -36,7 +36,7 @@ def get_diffusion_result(labeled_kinases, zscore_cutoff):
     experiment = diffusion.Diffusion(network, labeled_kinases)
     result = experiment.diffuse()
     # make z-score table
-    zscore_table = result.get_as_pandas_df_without_labels()
+    zscore_table = result.get_result_df_with_zscore()
     # make updated graph
     graph_nodes, node_styling = create_cytoscape_div(
         network, labeled_kinases, zscore_table, zscore_cutoff
@@ -222,7 +222,7 @@ def get_cyto_stylesheet(diffusion_result):
 
 
 def make_selector_colors(protein_colors):
-    """Color proteins according to their post-diffusion z-score."""
+    """Color proteins according to their post-diffusion rank."""
     selectors = []
     for protein, color in protein_colors.items():
         selector = {
@@ -237,7 +237,6 @@ def get_colors(diffusion_result):
     """Generate color gradient for displayed nodes."""
     xcolor_gradient = color_gradient.ColorGradientGenerator()
     xcolor_gradient.create_color_map2(base_color=[255, 51, 51])
-    print(diffusion_result["rank"])
     colors = xcolor_gradient.map_colors(
         1 - diffusion_result["rank"] / len(diffusion_result)
     )
@@ -449,7 +448,8 @@ def validate_inputs(n_clicks, protein_list):
         return message, diffusion_switch
     else:
         valid_kinases = InputValidator().validate(proteins)
-        # valid_kinases = [vk for vk in valid_kinases if vk in network.proteins]
+        valid_kinases = [vk for vk in valid_kinases if vk in network.proteins]
+        print(valid_kinases)
         invalid_kinases = [kinase for kinase in proteins if kinase not in valid_kinases]
         if len(valid_kinases) == 0:
             message.append(
@@ -525,7 +525,9 @@ def validate_inputs(n_clicks, protein_list):
 def diffuse(diffusion_switch, protein_list, loo_switch, zscore_cutoff):
     """Conducts diffusion experiment with input kinases."""
     proteins = re.findall("\w+", protein_list)
+    # have to validate again -- I am not good at passing data b/w callbacks
     valid_kinases = InputValidator().validate(proteins)
+    valid_kinases = [vk for vk in valid_kinases if vk in network.proteins]
     if "on" in loo_switch and len(valid_kinases) >= 2:
         # averaged post-diffusion results produced via LOO validation
         result_div, graph_nodes, node_styling = get_cross_validation_result(
