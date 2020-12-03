@@ -363,7 +363,8 @@ def get_theory_tab():
 
 def get_example_tab():
     """Returns contents of the example tab."""
-    return "This is the example tab."
+    content = [dcc.Markdown(app_text.tabs["example_tab"])]
+    return content
 
 
 def parse_input(text):

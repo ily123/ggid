@@ -1,5 +1,5 @@
 """Module to keep all of the app's text-heavy elements."""
-# why not keep the text in a csv file or database?
+# why not keep these in a csv file or database?
 
 
 auc_explanation = {
@@ -139,18 +139,57 @@ tabs = {
         basic approach in other domains. And now I have an app for that. Just
         have to change the underlying network and edit some text, and I am good to go!
         """,
-    "example": """
-        Let's say you'd like to study protein P53. It's central to several cancers,
-        and interacts with many kinases. You have a list of human kinases that
-        interact with P53, and you would like to know if there are any more.
+    "example_tab": """
+        ### Intro
+        You have kinase ABC that you know is involved in process XYZ. Your basic hypothesis is then:
 
-        Step 0: Find existing kinases by looking in the Phosposite database
-        Step 1: Enter these kinases in teh form
-        Step 3: Press diffuse
+        ```
+        Kinases connected to kinase ABC in the kinase network are also involved in process XYZ.
+        ```
+
+        The goal of the GGID tool is to find these closely connected neighbors using
+        the kinase network and diffusion.
+
+        ### Typical usecase
+
+        Let's say you are interested in the protein P53. It's central to several cancers,
+        and interacts with many kinases. You read the literature and realize that interaction
+        of P53 with its kinases is critical to several cancers.
+
+        You want to find any additional kinases that may interact with P53. So your hypothesis
+        becomes:
+
+        ```
+        Close network neigbors of P53 kinases are also P53 kinases.
+        ```
+
+        Here is how to generate a list of these putative neigbors using my tool:
+
+        **Step 1: Come up with a list of known P53 kinases.**
+
+        You can do it by reading literature or using a database like [Phosphosite](www.phosphosite.org). In this
+        case, lets skip over to [P53's page on Phoshosite](https://www.phosphosite.org/proteinAction.action?id=465&showAllSites=true)
+        and then go the *Upstream* tab. This tab lists all upstream regulators of P53.
+
+        One of the categories in the tab is *Kinases, in vitro*. This is the list of
+        kinases that phosphorylate P53 in the test tube. Here is the list:
+        ```
+        ATM, ATR, AurA, AurB, Btk, CDK1, CDK4, CDK5, CDK9, Chk1, Chk2, CK1A, CK2B,
+        DAPK1, DNAPK, DYRK1A, DYRK2, ERK1, ERK2, GRK5, HIPK2, JNK1, JNK2, LKB1, LRRK2,
+        MAPKAPK5, NEK2, NuaK1, P38A, P38G, PAK4, PKCD, PLK3, PRPK, SMG1, Src, TAF1, VRK1
+        ```
+
+        **Step 2: Enter these kinases in the diffusion form in the tool**
+
+
+        * Step 3: Press diffuse, click on LOO validation flag
+
+        * Step 4: Evaluate the results
+
 
         Recommended:
 
-        Step 4
+        Step 5
 
         """,
 }
