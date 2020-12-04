@@ -140,23 +140,15 @@ tabs = {
         have to change the underlying network and edit some text, and I am good to go!
         """,
     "example_tab": """
-        ### Intro
-        You have kinase ABC that you know is involved in process XYZ. Your basic hypothesis is then:
-
-        ```
-        Kinases connected to kinase ABC in the kinase network are also involved in process XYZ.
-        ```
-
-        The goal of the GGID tool is to find these closely connected neighbors using
-        the kinase network and diffusion.
-
         ### Typical usecase
+        The goal of the GGID tool is to find clusters of closely connected kinases.
 
         Let's say you are interested in the protein P53. It's central to several cancers,
         and interacts with many kinases. You read the literature and realize that interaction
         of P53 with its kinases is critical to several cancers.
 
-        You want to find any additional kinases that may interact with P53. So your hypothesis
+        In addition to any kinases you already know about,
+        you want to find any additional kinases that may interact with P53. So your hypothesis
         becomes:
 
         ```
@@ -170,7 +162,6 @@ tabs = {
         You can do it by reading literature or using a database like [Phosphosite](www.phosphosite.org). In this
         case, lets skip over to [P53's page on Phoshosite](https://www.phosphosite.org/proteinAction.action?id=465&showAllSites=true)
         and then go the *Upstream* tab. This tab lists all upstream regulators of P53.
-
         One of the categories in the tab is *Kinases, in vitro*. This is the list of
         kinases that phosphorylate P53 in the test tube. Here is the list:
         ```
@@ -180,6 +171,7 @@ tabs = {
         ```
 
         **Step 2: Enter these kinases in the diffusion form in the tool**
+        ![alt text](assets/screenshot_1.png)
 
 
         * Step 3: Press diffuse, click on LOO validation flag
