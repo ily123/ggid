@@ -1,6 +1,7 @@
 #main-container {
     width: 85%;
     padding: 0%;
+    background-color: white;
 }
 
 #network-layout-toggle
@@ -60,4 +61,8 @@ Summary {
 #kin-map-container {
     display: grid;
     justify-content: center;
+}
+
+body {
+    background-color: rgb(249, 250, 251);
 }
