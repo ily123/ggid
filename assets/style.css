@@ -14,6 +14,50 @@
     min-height: calc(90vh - 5rem);
 }
 
+#header {
+    width: 100%;
+    background-color: #343a40;
+}
+
 #footer {
     height: 5rem;
+    background-color: #343a40;
+}
+
+#footer-text {
+    text-align: center;
+    color: white;
+    padding-top: 1rem;
+}
+
+Summary {
+    font-weight: bold;
+}
+
+#input-kinase-list {
+    margin: auto;
+    width: 75%;
+    height: 20%;
+    margin-top: 50px;
+}
+
+#submit-button-div {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+}
+
+#zscore-cutoff {
+    width: 60px;
+}
+
+#input-toggles-form {
+    margin-top: 5px;
+    display: flex;
+    justify-content: center;
+}
+
+#kin-map-container {
+    display: grid;
+    justify-content: center;
 }

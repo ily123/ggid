@@ -59,7 +59,6 @@ def get_cross_validation_result(labeled_kinases, zscore_cutoff):
                 children=[
                     html.Summary(
                         "Cross-validation AUC is %1.2f (expand for details)" % auc,
-                        style={"font-weight": "bold"},
                     ),
                     dcc.Graph(id="loo-roc", figure=roc_fig),
                     html.Ul(
@@ -249,57 +248,41 @@ def get_main_tab():
     return [
         html.Div(
             dbc.Textarea(
-                id="kinase-list",
+                id="input-kinase-list",
                 placeholder="Enter kinase IDs in HUGO format (ex: CDC7, AURAB)",
-                style={"margin": "auto", "width": "75%", "height": "20%"},
                 value="CDK1",
             ),
-            style={
-                "display": "flex",
-                "justifyContent": "center",
-                "padding": "50px 0px 0px 0px",
-            },
         ),
         html.Div(
-            dbc.Button("DIFFUSE", id="submit-button", color="dark", n_clicks=None),
-            style={"display": "flex", "justifyContent": "center", "padding-top": "5px"},
-        ),
-        html.Div(
-            dbc.Form(
-                [
-                    dbc.FormGroup(
-                        dbc.Checklist(
-                            id="loo-switch",
-                            options=[
-                                {
-                                    "label": "cross-validate (for 2+ kinases)",
-                                    "value": "on",
-                                }
-                            ],
-                            value=[],  # when you checkmark, value is added to this list
-                        ),
-                        className="mr-3",
-                    ),
-                    dbc.FormGroup(
-                        [
-                            dbc.Label("graph hits with zscore of >="),
-                            dbc.Input(
-                                id="zscore-cutoff",
-                                value=2,
-                                type="number",
-                                style={
-                                    "width": "70px",
-                                },
-                            ),
-                        ],
-                    ),
-                ],
-                inline=True,
+            id="submit-button-div",
+            children=dbc.Button(
+                "DIFFUSE", id="submit-button", color="dark", n_clicks=None
             ),
-            style={
-                "display": "flex",
-                "justifyContent": "center",
-            },
+        ),
+        dbc.Form(
+            id="input-toggles-form",
+            children=[
+                dbc.FormGroup(
+                    dbc.Checklist(
+                        id="loo-switch",
+                        options=[
+                            {
+                                "label": "cross-validate (for 2+ kinases)",
+                                "value": "on",
+                            }
+                        ],
+                        value=[],  # when you checkmark, value is added to this list
+                    ),
+                    className="mr-3",
+                ),
+                dbc.FormGroup(
+                    [
+                        dbc.Label("graph hits with zscore of >="),
+                        dbc.Input(id="zscore-cutoff", value=2, type="number"),
+                    ],
+                ),
+            ],
+            inline=True,
         ),
         html.Br(),
         html.Div(id="status-line"),
@@ -323,9 +306,10 @@ def get_main_tab():
                         ),
                     ]
                 ),
-                # dbc package broke zoom and panning, so I had to use
+                # DBC package (?) broke zoom and panning, so I had to use
                 # raw pixels to set size of network area, and
-                # specify pan and zoom manually -- not a fan!
+                # to specify pan and zoom manually -- not a fan!
+                # Do not move it to a separate style sheet.
                 cyto.Cytoscape(
                     id="kin-map",
                     layout={"name": "circle", "fit": True},
@@ -339,16 +323,12 @@ def get_main_tab():
                     pan={"x": 500, "y": 300},
                 ),
             ],
-            style={
-                "display": "grid",
-                "justify-content": "center",
-                "align-content": "center",
-            },
         ),
         html.Div(id="results-container", children=[]),
-        # line below is a hidden utility switch for chaining callbacks
+        # Line below is a hidden utility switch for chaining callbacks
         # if user presents valid kinase list for diffusion, the switch
-        # value is set to 'valid' and diffusion callback fires
+        # value is set to 'valid' and diffusion callback fires.
+        # Do not move it to a separate style sheet.
         dcc.RadioItems(
             id="diffusion-switch", value="invalid", style={"display": "none"}
         ),
@@ -389,7 +369,6 @@ app.layout = dbc.Container(
         dbc.CardHeader(
             id="header",
             children=html.H1([dbc.Badge("GGID: Human Kinome", color="dark")]),
-            style={"width": "100%", "background-color": "#343a40"},
         ),
         html.Br(),
         dbc.Container(
@@ -406,17 +385,7 @@ app.layout = dbc.Container(
         html.Br(),
         dbc.CardFooter(
             id="footer",
-            children=[
-                html.P(
-                    "Ilya Novikov 2020",
-                    style={
-                        "text-align": "center",
-                        "color": "white",
-                        "padding-top": "1rem",
-                    },
-                )
-            ],
-            style={"background-color": "#343a40"},
+            children=[html.P(id="footer-text", children="Ilya Novikov 2020")],
         ),
     ],
 )
@@ -432,7 +401,7 @@ app.layout = dbc.Container(
         Output("diffusion-switch", "value"),
     ],
     [Input("submit-button", "n_clicks")],
-    [State("kinase-list", "value")],
+    [State("input-kinase-list", "value")],
     prevent_initial_call=True,
 )
 def validate_inputs(n_clicks, protein_list):
@@ -500,9 +469,7 @@ def validate_inputs(n_clicks, protein_list):
     # wrap alerts into a collapsible
     message_wrap = html.Details(
         children=[
-            html.Summary(
-                "Experiment summary (expand for details)", style={"font-weight": "bold"}
-            ),
+            html.Summary("Experiment summary (expand for details)"),
             html.Div(children=message),
         ]
     )
@@ -517,7 +484,7 @@ def validate_inputs(n_clicks, protein_list):
     ],
     [Input("diffusion-switch", "value")],
     [
-        State("kinase-list", "value"),
+        State("input-kinase-list", "value"),
         State("loo-switch", "value"),
         State("zscore-cutoff", "value"),
     ],
