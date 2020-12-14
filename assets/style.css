@@ -23,12 +23,27 @@
 #footer {
     height: 5rem;
     background-color: #343a40;
+    display: flex;
+    justify-content: center;
+    text-align: center;
 }
 
-#footer-text {
-    text-align: center;
+.footer-text {
     color: white;
-    padding-top: 1rem;
+    margin-top: 1rem;
+    margin-left: 0.5rem;
+}
+
+a:hover {
+    color: orange;
+    text-decoration: none;
+}
+
+.github-logo {
+    margin-top: 0.5rem;
+    margin-left: 1rem;
+    height: 32px;
+    width: 32px;
 }
 
 Summary {

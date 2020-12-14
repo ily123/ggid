@@ -351,6 +351,29 @@ def parse_input(text):
     re.findall("\w+", text)
 
 
+def get_footer_elements():
+    """Returns children of the footer div."""
+    footer_elems = [
+        html.P(className="footer-text", children="\u00A9 2020"),
+        html.A(
+            className="footer-text",
+            href="https://www.ilyanovikov.io",
+            children="Ilya Novikov",
+        ),
+        html.A(
+            href="https://github.com/ily123/ggid",
+            children=html.Img(
+                className="github-logo", src="assets/GitHub-Mark-Light-32px.png"
+            ),
+        ),
+        html.A(
+            href="https://linkedin.com/in/ilyabnovikov",
+            children=html.Img(className="github-logo", src="assets/linkedin-3-32.png"),
+        ),
+    ]
+    return footer_elems
+
+
 # ---
 # main app layout:
 
@@ -383,10 +406,7 @@ app.layout = dbc.Container(
         ),
         html.Br(),
         html.Br(),
-        dbc.CardFooter(
-            id="footer",
-            children=[html.P(id="footer-text", children="Ilya Novikov 2020")],
-        ),
+        dbc.CardFooter(id="footer", children=get_footer_elements()),
     ],
 )
 
