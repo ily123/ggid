@@ -347,10 +347,6 @@ def get_example_tab():
     return content
 
 
-def parse_input(text):
-    re.findall("\w+", text)
-
-
 def get_footer_elements():
     """Returns children of the footer div."""
     footer_elems = [
