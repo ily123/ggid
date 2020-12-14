@@ -243,6 +243,31 @@ def get_colors(diffusion_result):
     return color_dict
 
 
+def get_graph_layout_options(isdisabled=True):
+    """Returns layout options for the radio form.
+
+    Parameters
+    ----------
+    isdiabled : bool
+        If True, turns off the CPU-intensive options
+    """
+    options = [
+        {"label": "Circle", "value": "circle"},
+        {"label": "Concentric", "value": "concentric"},
+        {
+            "label": "Spread",
+            "value": "spread",
+            "disabled": isdisabled,
+        },
+        {
+            "label": "Force-directed",
+            "value": "cola",
+            "disabled": isdisabled,
+        },
+    ]
+    return options
+
+
 def get_main_tab():
     """Returns main tab content."""
     return [
@@ -295,12 +320,7 @@ def get_main_tab():
                         dbc.Label("Adjust graph layout"),
                         dbc.RadioItems(
                             id="network-layout-toggle",
-                            options=[
-                                {"label": "Circle", "value": "circle"},
-                                {"label": "Concentric", "value": "concentric"},
-                                {"label": "Spread", "value": "spread"},
-                                {"label": "Force-directed", "value": "cola"},
-                            ],
+                            options=get_graph_layout_options(),
                             value="circle",
                             inline=True,
                         ),
@@ -497,6 +517,7 @@ def validate_inputs(n_clicks, protein_list):
         Output("results-container", "children"),
         Output("kin-map", "elements"),
         Output("kin-map", "stylesheet"),  # 'stylesheet' is different from 'style'
+        Output("network-layout-toggle", "options"),
     ],
     [Input("diffusion-switch", "value")],
     [
@@ -523,10 +544,8 @@ def diffuse(diffusion_switch, protein_list, loo_switch, zscore_cutoff):
             valid_kinases, zscore_cutoff
         )
         result_div = [convert_to_dash_table(zscore_table)]
-
-    # add z-score explanation
-    # result_div.insert(0, html.H3(dbc.Badge("Diffusion Result:", color="secondary")))
-    return result_div, graph_nodes, node_styling
+    graph_options = get_graph_layout_options(isdisabled=False)
+    return result_div, graph_nodes, node_styling, graph_options
 
 
 @app.callback(
