@@ -70,7 +70,12 @@ def get_cross_validation_result(labeled_kinases, zscore_cutoff):
                     ),
                 ],
             ),
-            convert_to_dash_table(zscore_table),
+            html.Details(
+                children=[
+                    html.Summary("Full z-score and ranks table (expand for details)"),
+                    convert_to_dash_table(zscore_table),
+                ]
+            ),
         ]
     )
     # make updated graph
@@ -488,7 +493,7 @@ def display_tapped_node_data(data, diffusion_switch):
             html.Td(data["id"]),
             html.Td("True" if data["input_label_flag"] == 1 else "False"),
             html.Td(data["rank"] if data["rank"] else "None"),
-            html.Td(data["zscore"] if data["zscore"] else "None"),
+            html.Td("%1.2f" % data["zscore"] if data["zscore"] else "None"),
         ]
     )
     return out
@@ -602,11 +607,18 @@ def diffuse(diffusion_switch, protein_list, loo_switch, zscore_cutoff):
             valid_kinases, zscore_cutoff
         )
     else:
-        # plain diffusion, with no LOO validation and averaging
+        # plain diffusion, with no LOO validation
         zscore_table, graph_nodes, node_styling = get_diffusion_result(
             valid_kinases, zscore_cutoff
         )
-        result_div = [convert_to_dash_table(zscore_table)]
+        result_div = (
+            html.Details(
+                children=[
+                    html.Summary("Full z-score and ranks table (expand for details)"),
+                    convert_to_dash_table(zscore_table),
+                ]
+            ),
+        )
     graph_options = get_graph_layout_options(isdisabled=False)
     node_info_style = {}  # this div is hidden prior to diffusion
     return result_div, graph_nodes, node_styling, graph_options, node_info_style
