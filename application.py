@@ -188,22 +188,22 @@ def create_cytoscape_div(network, labels, diffusion_result, zscore_cutoff):
     """Constructs updated cytoscape div."""
     top_hits = diffusion_result[diffusion_result.zscore >= zscore_cutoff]
     top_hits_nodes = list(top_hits.protein.values)
-    elements = get_cluster_elements(network, labels, top_hits_nodes)
-    new_elements = elements
-    new_style = get_cyto_stylesheet(top_hits)
-    return new_elements, new_style
+    graph_elements = get_cluster_elements(network, labels, top_hits_nodes)
+    # determine if experiment was a LOO cross val
+    is_loo = len(network.proteins) == len(diffusion_result)
+    graph_style = get_cyto_stylesheet(top_hits, is_loo)
+    return graph_elements, graph_style
 
 
-def get_cyto_stylesheet(diffusion_result):
+def get_cyto_stylesheet(diffusion_result, is_loo):
     """Style nodes according to post-diffusion results."""
-    # mark input proteins with a diamond
     stylesheet = [
         {"selector": "node", "style": {"label": "data(label)"}},
         {
             "selector": "[input_label_flag=1]",
             "style": {
                 "shape": "diamond",
-                "background-color": "red",
+                "background-color": "white" if is_loo else "red",
                 "line-color": "black",
                 "border-color": "black",
                 "border-width": "2",
@@ -215,8 +215,10 @@ def get_cyto_stylesheet(diffusion_result):
         },
     ]
     # color nodes according to their post-diffusion z-score
+    # this will overwrite default white of labels in a loo experiment
     protein_colors = get_colors(diffusion_result)
     color_selectors = make_selector_colors(protein_colors)
+    print(color_selectors)
     return stylesheet + color_selectors
 
 
