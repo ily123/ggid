@@ -153,7 +153,7 @@ def get_network_elements(network):
     return elements
 
 
-def get_cluster_elements(network, input_proteins, top_hits):
+def get_cluster_elements(network, input_proteins, top_hits, diffusion_result):
     """Constructs cytoscape view for the post-diffusion result."""
     # The goal is to make a graph view of the input proteins and
     # their most closely connected post-diffusion hits. (Together,
@@ -172,13 +172,18 @@ def get_cluster_elements(network, input_proteins, top_hits):
             }  # no redundant edges
             if (edge_ij not in elements) and (edge_ji not in elements):
                 elements.append(edge_ij)
-    # now add nodes to the view, and flag the input proteins (for formatting later)
+    # now add nodes to the view, and attach experimental data to the nodes
+    zscores = dict(zip(diffusion_result.protein, diffusion_result.zscore))
+    ranks = dict(zip(diffusion_result.protein, diffusion_result["rank"]))
     for node in cluster:
-        isinput = 0
-        if node in input_proteins:
-            isinput = 1
         node_notation = {
-            "data": {"id": node, "label": node, "input_label_flag": isinput}
+            "data": {
+                "id": node,
+                "label": node,
+                "input_label_flag": 0 if node not in input_proteins else 1,
+                "zscore": None if node not in zscores else zscores[node],
+                "rank": None if node not in ranks else ranks[node],
+            }
         }
         elements.append(node_notation)
     return elements
@@ -188,7 +193,9 @@ def create_cytoscape_div(network, labels, diffusion_result, zscore_cutoff):
     """Constructs updated cytoscape div."""
     top_hits = diffusion_result[diffusion_result.zscore >= zscore_cutoff]
     top_hits_nodes = list(top_hits.protein.values)
-    graph_elements = get_cluster_elements(network, labels, top_hits_nodes)
+    graph_elements = get_cluster_elements(
+        network, labels, top_hits_nodes, diffusion_result
+    )
     # determine if experiment was a LOO cross val
     is_loo = len(network.proteins) == len(diffusion_result)
     graph_style = get_cyto_stylesheet(top_hits, is_loo)
@@ -218,7 +225,6 @@ def get_cyto_stylesheet(diffusion_result, is_loo):
     # this will overwrite default white of labels in a loo experiment
     protein_colors = get_colors(diffusion_result)
     color_selectors = make_selector_colors(protein_colors)
-    print(color_selectors)
     return stylesheet + color_selectors
 
 
@@ -277,7 +283,7 @@ def get_main_tab():
             dbc.Textarea(
                 id="input-kinase-list",
                 placeholder="Enter kinase IDs in HUGO format (ex: CDC7, AURAB)",
-                value="CDK1",
+                value="CDK1, CDC7",
             ),
         ),
         html.Div(
@@ -344,6 +350,17 @@ def get_main_tab():
                     elements=get_network_elements(network),
                     pan={"x": 500, "y": 300},
                 ),
+                html.Div(
+                    id="node-info-wrapper",
+                    children=[
+                        html.Table(id="node-info", children=construct_empty_table()),
+                        html.P(
+                            """Note: input proteins are excluded from
+                          ranking unless cross-validated."""
+                        ),
+                    ],
+                    style={"display": "None"},
+                ),
             ],
         ),
         html.Div(id="results-container", children=[]),
@@ -359,13 +376,13 @@ def get_main_tab():
 
 def get_theory_tab():
     """Returns content of theory tab."""
-    content = [dcc.Markdown(app_text.tabs["theory_tab"])]
+    content = dcc.Markdown(app_text.tabs["theory_tab"])
     return content
 
 
 def get_example_tab():
     """Returns contents of the example tab."""
-    content = [dcc.Markdown(app_text.tabs["example_tab"])]
+    content = dcc.Markdown(app_text.tabs["example_tab"])
     return content
 
 
@@ -390,6 +407,29 @@ def get_footer_elements():
         ),
     ]
     return footer_elems
+
+
+def construct_empty_table():
+    """Creates empty scaffold for node info table."""
+    empty_table = [
+        html.Tr(
+            children=[
+                html.Th("Protein"),
+                html.Th("Input Protein"),
+                html.Th("Rank"),
+                html.Th("Zscore"),
+            ]
+        ),
+        html.Tr(
+            children=[
+                html.Td("Click on a node"),
+                html.Td(),
+                html.Td(),
+                html.Td(),
+            ]
+        ),
+    ]
+    return empty_table
 
 
 # ---
@@ -434,6 +474,27 @@ app.layout = dbc.Container(
 
 
 @app.callback(
+    Output("node-info", "children"),
+    Input("kin-map", "tapNodeData"),
+    State("diffusion-switch", "value"),
+    prevent_initial_call=True,
+)
+def display_tapped_node_data(data, diffusion_switch):
+    if diffusion_switch != "valid":
+        return None  # unless diffusion experiment has been done, return nothing
+    out = construct_empty_table()
+    out[1] = html.Tr(
+        children=[
+            html.Td(data["id"]),
+            html.Td("True" if data["input_label_flag"] == 1 else "False"),
+            html.Td(data["rank"] if data["rank"] else "None"),
+            html.Td(data["zscore"] if data["zscore"] else "None"),
+        ]
+    )
+    return out
+
+
+@app.callback(
     [
         Output("status-line", "children"),
         Output("diffusion-switch", "value"),
@@ -457,7 +518,6 @@ def validate_inputs(n_clicks, protein_list):
     else:
         valid_kinases = InputValidator().validate(proteins)
         valid_kinases = [vk for vk in valid_kinases if vk in network.proteins]
-        print(valid_kinases)
         invalid_kinases = [kinase for kinase in proteins if kinase not in valid_kinases]
         if len(valid_kinases) == 0:
             message.append(
@@ -520,6 +580,7 @@ def validate_inputs(n_clicks, protein_list):
         Output("kin-map", "elements"),
         Output("kin-map", "stylesheet"),  # 'stylesheet' is different from 'style'
         Output("network-layout-toggle", "options"),
+        Output("node-info-wrapper", "style"),
     ],
     [Input("diffusion-switch", "value")],
     [
@@ -547,7 +608,8 @@ def diffuse(diffusion_switch, protein_list, loo_switch, zscore_cutoff):
         )
         result_div = [convert_to_dash_table(zscore_table)]
     graph_options = get_graph_layout_options(isdisabled=False)
-    return result_div, graph_nodes, node_styling, graph_options
+    node_info_style = {}  # this div is hidden prior to diffusion
+    return result_div, graph_nodes, node_styling, graph_options, node_info_style
 
 
 @app.callback(
