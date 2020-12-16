@@ -4,6 +4,52 @@ import numpy as np
 from scipy import sparse
 
 
+class Annotations:
+    """Container for storing annotation data."""
+
+    def __init__(self, anno_fp):
+        """Inits with path to annotations gaf file."""
+        self.anno_fp = anno_fp
+        header = [
+            "DB",
+            "DB_Object_ID",
+            "DB_Object_Symbol",
+            "Qualifier",
+            "GO_ID",
+            "DB_Reference",
+            "Evidence_Code",
+            "With_or_From",
+            "Aspect",
+            "DB_Object_Name",
+            "DB_Object_Synonym",
+            "DB_Object_Type",
+            "Taxon",
+            "Date",
+            "Assigned_By",
+            "Annotation_Extension",
+            "Gene_Product_Form_ID",
+        ]
+        self.annotations = pd.read_csv(anno_fp, header=None, sep="\t", comment="!")
+        self.annotations.columns = header
+
+    def get_counts(self):
+        """Count number of times each GO term appears in annotation corpus."""
+        counts = self.annotations.groupby("GO_ID").size()
+        return counts
+
+
+class FrequencyTable:
+    def __init__(self, annotations, ancestry_matrix):
+        shallow_count = annotations.get_counts()
+        self.deep_count = ancestry_matrix.get_deep_count(shallow_count)
+        self.index_dict = ancestry_matrix.index_dict
+
+        self.information_content = -1 * np.log10(
+            self.deep_count.sum(axis=0) / self.deep_count.sum()
+        )
+        self.ic = dict(zip(list(self.index_dict), self.information_content.tolist()[0]))
+
+
 class OBOParser:
     """Gene Ontology .obo file parser."""
 
@@ -76,7 +122,7 @@ class GoGraph:
                 self.connect_two_nodes(node_id, ancestor_id)
 
     def connect_two_nodes(self, child_id, ancestor_id):
-        """Connect a child and an ancestor node given their ids."""
+        """Connects a child and an ancestor node given their ids."""
         self.nodes[ancestor_id].add_child(self.nodes[child_id])
         self.nodes[child_id].add_ancestor(self.nodes[ancestor_id])
 
@@ -188,8 +234,8 @@ class AncestryMatrix:
         # That is what we do here.
         #
         # We count the number of times each term appears explicitly in the anno
-        # coprus, then multiply it by the flat ancestry matrix to crate a matrix
-        # of full implied ancestry counts.
+        # coprus, then multiply it by the flat ancestry matrix to create a matrix
+        # of complete/implied ancestry counts.
         explicit_counts = self._encode_annotation_counts(term_counts)
         return self.matrix.multiply(explicit_counts)
 
