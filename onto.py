@@ -1,14 +1,194 @@
 import re
+from typing import Any, Dict, List, Type, Union
 
 import numpy as np
+import pandas as pd
 from scipy import sparse
+
+
+class GoTerm:
+    """GO term node in the Gene Ontology tree/dag.
+
+    Attributes
+    ----------
+    id_ : str
+        GO id of the term
+    namespace : str, optional
+        ontology namespace of the term (MF, BP, or CC)
+    definition : str, optional
+        definition of the term
+    is_a : str, optional
+        is_a ancestor field
+    ancestors : List[GoTerm]
+        list of the term's ancestor terms
+    children : list[GoTerm]
+        list of the term's child terms
+    """
+
+    def __init__(self, id_: str) -> None:
+        """Inits with GO term id.
+
+        Parameters
+        ----------
+        id_ : str
+            GO term id (ex: "GO:0000001")
+        """
+        self.id = id_
+        self.namespace = None
+        self.definition = None
+        self.is_a = None
+        self.ancestors = []
+        self.children = []
+
+    def add_child(self, child_term: Type["GoTerm"]) -> None:
+        """Adds child term.
+
+        Parameters
+        ----------
+        child_term : GoTerm
+            GoTerm object that is a child of this term
+        """
+        self.children.append(child_term)
+
+    def add_ancestor(self, ancestor_term: Type["GoTerm"]) -> None:
+        """Adds ancestor term.
+
+        Parameters
+        ----------
+        ancestor_term : GoTerm
+            GoTerm object that is an ancestor of this term
+        """
+        self.ancestors.append(ancestor_term)
+
+
+class GoGraph:
+    """Graph implementation of the Gene term Ontology.
+
+    Attributes
+    ----------
+    nodes : Dict
+        dictionary of nodes in the graph, addressed by id
+    full_ancestry : Dict[List]
+        dictionary of term -> term ancestors traced to the root
+    """
+
+    def __init__(self) -> None:
+        """Inits empty."""
+        # keep track of all nodes using a dictionary
+        self.nodes = {}
+
+    def add_node(self, node: Type[GoTerm]) -> None:
+        """Pushes a new node into the node dictionary.
+
+        Parameters
+        ----------
+        node : GoTerm
+            a GO term object
+        """
+        self.nodes[node.id] = node
+
+    def get_node_by_id(self, term_id: str) -> Union[None, Type[GoTerm]]:
+        """Returns term node given term id (ex: 'GO:0000001').
+
+        Parameters
+        ----------
+        term_id : str
+            GO id of the term (ex: "GO:0000001")
+        """
+        if term_id in self.nodes:
+            return self.nodes[term_id]
+        return None
+
+    def draw_connections(self) -> None:
+        """Connects all ancestor and child nodes."""
+        for node in self.nodes.values():
+            node_id = node.id
+            for ancestor_id in node.ancestor_ids:
+                self.connect_two_nodes(node_id, ancestor_id)
+
+    def connect_two_nodes(self, child_id: str, ancestor_id: str) -> None:
+        """Connects a child and an ancestor node given their ids.
+
+        Parameters
+        ----------
+        child_id : str
+            GO id of the child term
+        ancestor_id : str
+            GO id of the ancestor term
+        """
+        self.nodes[ancestor_id].add_child(self.nodes[child_id])
+        self.nodes[child_id].add_ancestor(self.nodes[ancestor_id])
+
+    def traverse(self, node_id: str) -> List[str]:
+        """Traverses GO graph from given node to root.
+
+        Parameters
+        ----------
+        node_id : str
+            GO term id of node (ex: 'GO:0000001')
+
+        Returns
+        -------
+        ancestors : list
+            list of acestor GO term ids
+
+        Note:
+            The list of ancestor ids will have duplicates, because
+            in the GO ontology children can have multiple parents and
+            so there are multiple paths leading to the root.
+
+            For example:
+
+                    -C-
+                A--B   F--root
+                    -D-
+
+            Calling traverse(A) will return
+                [B, C, F, root, D, F, root]
+        """
+        ancestors = []
+        if self.nodes[node_id].ancestors != []:
+            for ancestor in self.nodes[node_id].ancestors:
+                ancestors.append(ancestor.id)
+                ancestors.extend(self.traverse(ancestor.id))
+        return ancestors
+
+    def get_full_ancestry(self, node_id: str) -> List[str]:
+        """Returns all ancestors for a given term.
+
+        Parameters
+        ----------
+            node_id : str
+                GO term id of node (ex: 'GO:0000001')
+        Returns
+        -------
+            ancestors : list
+                list of acestor GO term ids
+        """
+        return list(set(self.traverse(node_id)))
+
+    def make_ancestry_matrix(self) -> None:
+        """Creates matrix mapping GO terms to their ancestors.
+
+        The ancestry is complete, and includes all terms to the root.
+        """
+        self.full_ancestry = {}
+        for node_id in list(self.nodes):
+            self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
+        self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
 
 
 class Annotations:
     """Container for storing annotation data."""
 
-    def __init__(self, anno_fp):
-        """Inits with path to annotations gaf file."""
+    def __init__(self, anno_fp: str) -> None:
+        """Inits with path to annotations gaf file.
+
+        Parameters
+        ----------
+        anno_fp : str
+            path to annotations file in gaf-2 format
+        """
         self.anno_fp = anno_fp
         header = [
             "DB",
@@ -32,10 +212,33 @@ class Annotations:
         self.annotations = pd.read_csv(anno_fp, header=None, sep="\t", comment="!")
         self.annotations.columns = header
 
-    def get_counts(self):
-        """Count number of times each GO term appears in annotation corpus."""
+    def get_counts(self) -> Dict[str, int]:
+        """Counts number of times terms appear in annotation corpus.
+
+        Returns
+        -------
+        counts : Dict[str, int]
+            term counts
+        """
         counts = self.annotations.groupby("GO_ID").size()
         return counts
+
+    def filter(self, keep_namespace: str) -> None:
+        """Removes annotations outside of namespace, inplace.
+
+        Parameters
+        ----------
+        keep_namespace : str
+            string token of namespace to keep (C, P, or F)
+        """
+        legal_namespace = ["C", "P", "F"]
+        if keep_namespace.upper() not in legal_namespace:
+            raise ValueError(
+                "Namespace must be one of: %s" % ", ".join(legal_namespace)
+            )
+        self.annotations = self.annotations.loc[
+            self.annotations.Aspect == keep_namespace, :
+        ]
 
 
 class FrequencyTable:
@@ -53,12 +256,12 @@ class FrequencyTable:
 class OBOParser:
     """Gene Ontology .obo file parser."""
 
-    def __init__(self, obo_fp):
+    def __init__(self, obo_fp: str) -> None:
         """Inits with file path to obo file."""
         self.obo_fp = obo_fp
 
-    def parse_ontology(self):
-        """Parses the .obo file"""
+    def parse_ontology(self) -> Type[GoGraph]:
+        """Parses the .obo file."""
         obo_file = open(self.obo_fp, "r")
         go_dag = GoGraph()
         term_flag = False
@@ -90,94 +293,11 @@ class OBOParser:
         return go_dag
 
     @staticmethod
-    def _parse_ancestor_id(line):
+    def _parse_ancestor_id(line) -> Union[None, str]:
         """Extracts go term ids from 'is_a' and 'relatioship' fields."""
         capture = re.search("(GO:\d{7})\s!\s", line)
         if capture:
             return capture.group(1)
-
-
-class GoGraph:
-    """Graph implementation of the Gene term Ontology."""
-
-    def __init__(self):
-        """Inits naked."""
-        # keep track of all nodes using a dictionary
-        self.nodes = {}
-
-    def add_node(self, node):
-        """Pushes a new node into the node dictionary."""
-        self.nodes[node.id] = node
-
-    def get_node_by_id(self, term_id):
-        """Returns term node given term id (ex: 'GO:0000001')."""
-        if term_id in self.nodes:
-            return self.nodes[term_id]
-
-    def draw_connections(self):
-        """Connects all ancestor and child nodes."""
-        for node in self.nodes.values():
-            node_id = node.id
-            for ancestor_id in node.ancestor_ids:
-                self.connect_two_nodes(node_id, ancestor_id)
-
-    def connect_two_nodes(self, child_id, ancestor_id):
-        """Connects a child and an ancestor node given their ids."""
-        self.nodes[ancestor_id].add_child(self.nodes[child_id])
-        self.nodes[child_id].add_ancestor(self.nodes[ancestor_id])
-
-    def traverse(self, node_id):
-        """Traverses GO graph from given node to root.
-
-        Parameters:
-            node_id : str
-                GO term id of node (ex: 'GO:0000001')
-        Return:
-            ancestors : list
-                list of acestor GO term ids
-
-        Note:
-            The list of ancestor ids will have duplicates, because
-            in the GO ontology children can have multiple parents and
-            so there are multiple paths leading to the root.
-
-            For example:
-
-                    /C\
-                A--B   F--root
-                    \D/
-
-            Calling traverse(A) will return
-                [B, C, F, root, D, F, root]
-        """
-        ancestors = []
-        if self.nodes[node_id].ancestors != []:
-            for ancestor in self.nodes[node_id].ancestors:
-                ancestors.append(ancestor.id)
-                ancestors.extend(self.traverse(ancestor.id))
-        return ancestors
-
-    def get_full_ancestry(self, node_id):
-        """Returns all ancestors for a given term.
-
-        Parameters:
-            node_id : str
-                GO term id of node (ex: 'GO:0000001')
-        Return:
-            ancestors : list
-                list of acestor GO term ids
-        """
-        return list(set(self.traverse(node_id)))
-
-    def make_ancestry_matrix(self):
-        """Creates matrix mapping GO terms to their ancestors.
-
-        The ancestry is complete, and includes all terms to the root.
-        """
-        self.full_ancestry = {}
-        for node_id in list(self.nodes):
-            self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
-        self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
 
 
 class AncestryMatrix:
@@ -238,29 +358,3 @@ class AncestryMatrix:
         # of complete/implied ancestry counts.
         explicit_counts = self._encode_annotation_counts(term_counts)
         return self.matrix.multiply(explicit_counts)
-
-
-class GoTerm:
-    """Node in the Gene Ontology tree/dag."""
-
-    def __init__(self, id_=None, namespace=None, definition=None, is_a=None):
-        """Inits empty with a few attrs set to None."""
-        self.id = id_
-        self.namespace = namespace
-        self.definition = definition
-        if is_a is None:
-            self.is_a = []
-        self.ancestor_ids = []
-        self.child_ids = []
-        self.ancestors = []
-        self.children = []
-
-    def add_child(self, child_term):
-        """Adds child term."""
-        # Why do I have both pointer-like and dictionary tracking?
-        self.children.append(child_term)
-        self.child_ids.append(child_term.id)
-
-    def add_ancestor(self, ancestor_term):
-        """Adds ancestor term."""
-        self.ancestors.append(ancestor_term)

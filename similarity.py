@@ -48,7 +48,6 @@ class SimilarityCalculator:
 
     def get_anno_dict(self, annotations):
         """Convert pandas df of entity->term into a dictionary."""
-
         return dict(annotations.groupby("DB_Object_Symbol")["GO_ID"].apply(list))
 
     def calculate_similarity(self):
@@ -271,5 +270,4 @@ class SimilarityMatrix:
         save_path : str
             Desired file path of the output pickle file.
         """
-
         pickle.dump(self, open(save_path, "wb"))
