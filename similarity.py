@@ -67,27 +67,6 @@ class SimilarityCalculator:
         self.store_sim_matrix = sim_matrix
         self.sim_matrix = SimilarityMatrix(sim_matrix, self.proteins)
 
-    def calc_sim_segment(self, list_a, list_all):
-        print("worker started")
-        t = time.time()
-        for protein_a in list_a:
-            for protein_b in list_all:
-                sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
-        print("worker done", time.time() - t)
-
-    def calculate_similarity_mult_cpu(self):
-        self.workers = []
-        for i in list(range(2)):
-            sublist = self.proteins
-            p = multiprocessing.Process(
-                target=self.calc_sim_segment,
-                args=(
-                    sublist,
-                    self.proteins,
-                ),
-            )
-            self.workers.append(p)
-            p.start()
 
     def calculate_similarity_two_proteins(self, protein_a, protein_b):
         """Calculate Resnik similarity between two proteins."""
@@ -118,14 +97,7 @@ class SimilarityCalculator:
 
                 if ic_mica > best_mica:
                     best_mica = ic_mica
-            row_micas.append(row_mica)
-        #        return best_mica
-        #        return avg/(len(terms_a) * len(terms_b))
         return np.array(row_micas).mean()
-        #  a b c
-        # d x x x
-        # e x x x
-        # f x x x
 
     def get_ic_mica(self, term1, term2):
         """Given two terms, Find IC of their  MICA.
@@ -148,24 +120,6 @@ class SimilarityCalculator:
                 most_specific = self.ft.ic[ancestor]
 
         return most_specific
-
-    def get_exhaustive(self):
-        """
-        Note:
-        Going through each protein-protein pair (and the term-term
-        pairs within the protein-protien pair) means we will be
-        recalculating term-term pairs ad naseum.
-
-        There are n proteins, each has on average 15 terms.
-
-        (15*15 terms) * (19,000 * 19,000) proteins = 90 billion MICA calculations
-
-        If we precalculate the term-term similarity, thats
-        47,000 * 47,000 = 2.3 billion MICA calculations
-        20,000 * 20,000 proteins = 0.4 billion
-        """
-
-        return 0
 
 
 class SimilarityMatrix:
