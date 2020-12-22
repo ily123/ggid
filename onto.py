@@ -17,8 +17,6 @@ class GoTerm:
         ontology namespace of the term (MF, BP, or CC)
     definition : str, optional
         definition of the term
-    is_a : str, optional
-        is_a ancestor field
     ancestors : List[GoTerm]
         list of the term's ancestor terms
     children : list[GoTerm]
@@ -36,7 +34,7 @@ class GoTerm:
         self.id = id_
         self.namespace = None
         self.definition = None
-        self.is_a = None
+        self.ancestor_ids = []
         self.ancestors = []
         self.children = []
 
@@ -72,10 +70,50 @@ class GoGraph:
         dictionary of term -> term ancestors traced to the root
     """
 
-    def __init__(self) -> None:
-        """Inits empty."""
+    def __init__(self, obo_fp: str) -> None:
+        """Inits with obo file fp.
+
+        Parameters
+        ----------
+        obo_fp : str
+            file path to the OBO file containing the GO DAG
+        """
         # keep track of all nodes using a dictionary
         self.nodes = {}
+        self.obo_fp = obo_fp
+
+    def parse_ontology(self) -> None:
+        """Parses the .obo file."""
+        obo_file = open(self.obo_fp, "r")
+        term_flag = False
+        for line in obo_file:
+            capture = re.search("(.+):\s(.+)\n", line)
+            if line == "[Term]\n":
+                term_flag = True
+            elif line == "\n":
+                term_flag = False
+            if capture and term_flag:
+                name = capture.group(1)
+                content = capture.group(2)
+                if name == "id":
+                    go_term = GoTerm(id_=content)
+                    self.add_node(go_term)  # push term into dict
+                elif name in ["is_a", "relationship"]:
+                    capture = re.search("(GO:\d{7})\s!\s", content)
+                    ancestor_id = capture.group(1)
+                    go_term.ancestor_ids.append(ancestor_id)
+                elif name == "name":
+                    go_term.name = content
+                elif name == "namespace":
+                    go_term.namespace = content
+                elif name == "def":
+                    go_term.definition = content
+                elif name == "is_obsolete":
+                    # obsolete status is the last line in the term entry
+                    # we don't want obsolete terms in the tree
+                    del self.nodes[go_term.id]
+        obo_file.close()
+        self.draw_connections()  # connect terms
 
     def add_node(self, node: Type[GoTerm]) -> None:
         """Pushes a new node into the node dictionary.
@@ -177,6 +215,17 @@ class GoGraph:
             self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
         self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
 
+    def calculate_term_specificity(self, annotations: Type["Annotations"]) -> None:
+        """Calculates specificity of each GO term in the graph.
+
+        The specificity var will is assigned to GoTerm objects.
+        Parameters
+        ----------
+        annotations : Annotations
+            GO term annotation corpus, a mapping of annotations to terms
+        """
+        pass
+
 
 class Annotations:
     """Container for storing annotation data."""
@@ -251,53 +300,6 @@ class FrequencyTable:
             self.deep_count.sum(axis=0) / self.deep_count.sum()
         )
         self.ic = dict(zip(list(self.index_dict), self.information_content.tolist()[0]))
-
-
-class OBOParser:
-    """Gene Ontology .obo file parser."""
-
-    def __init__(self, obo_fp: str) -> None:
-        """Inits with file path to obo file."""
-        self.obo_fp = obo_fp
-
-    def parse_ontology(self) -> Type[GoGraph]:
-        """Parses the .obo file."""
-        obo_file = open(self.obo_fp, "r")
-        go_dag = GoGraph()
-        term_flag = False
-        for line in obo_file:
-            capture = re.search("(.+):\s(.+)\n", line)
-            if line == "[Term]\n":
-                term_flag = True
-            elif line == "\n":
-                term_flag = False
-
-            if capture and term_flag:
-                name = capture.group(1)
-                content = capture.group(2)
-                if name == "id":
-                    go_term = GoTerm(id_=content)
-                    go_dag.add_node(go_term)  # push term into tree
-                elif name in ["is_a", "relationship"]:
-                    go_term.is_a.append(content)
-                    go_term.ancestor_ids.append(self._parse_ancestor_id(content))
-                elif name == "name":
-                    go_term.name = content
-                elif name == "namespace":
-                    go_term.namespace = content
-                elif name == "def":
-                    go_term.definition = content
-        obo_file.close()
-
-        go_dag.draw_connections()  # connect terms
-        return go_dag
-
-    @staticmethod
-    def _parse_ancestor_id(line) -> Union[None, str]:
-        """Extracts go term ids from 'is_a' and 'relatioship' fields."""
-        capture = re.search("(GO:\d{7})\s!\s", line)
-        if capture:
-            return capture.group(1)
 
 
 class AncestryMatrix:
