@@ -33,10 +33,12 @@ class GoTerm:
         """
         self.id = id_
         self.namespace = None
+        self.name = None
         self.definition = None
         self.ancestor_ids = []
         self.ancestors = []
         self.children = []
+        self.specificity = None
 
     def add_child(self, child_term: Type["GoTerm"]) -> None:
         """Adds child term.
@@ -205,26 +207,38 @@ class GoGraph:
         """
         return list(set(self.traverse(node_id)))
 
-    def make_ancestry_matrix(self) -> None:
-        """Creates matrix mapping GO terms to their ancestors.
-
-        The ancestry is complete, and includes all terms to the root.
-        """
-        self.full_ancestry = {}
-        for node_id in list(self.nodes):
-            self.full_ancestry[node_id] = self.get_full_ancestry(node_id)
-        self.ancestry_matrix = AncestryMatrix(self.full_ancestry)
-
-    def calculate_term_specificity(self, annotations: Type["Annotations"]) -> None:
+    def calculate_term_specificity(
+        self, annotations: Type["Annotations"]
+    ) -> Dict[str, float]:
         """Calculates specificity of each GO term in the graph.
 
-        The specificity var will is assigned to GoTerm objects.
         Parameters
         ----------
         annotations : Annotations
             GO term annotation corpus, a mapping of annotations to terms
+
+        Returns
+        -------
+        term_specificity : dict[str, float]
+            mapping of terms to their specificty (neg log frequency)
         """
-        pass
+        full_ancestry = {}
+        for node_id in list(self.nodes):
+            full_ancestry[node_id] = self.get_full_ancestry(node_id)
+        spec_calc = SpecificityCalculator(full_ancestry, annotations)
+        term_specificity = spec_calc.get_specificity()
+        return term_specificity
+
+    def assign_term_specificity(self, term_specificity: Dict[str, float]) -> None:
+        """Assigns term specificity to each term in the tree.
+
+        Parameters
+        ----------
+        term_specificity : dict[str, float]
+            mapping of terms to their specificty (neg log frequency)
+        """
+        for term, specificity in term_specificity.items():
+            self.nodes[term].specificity = specificity
 
 
 class Annotations:
@@ -290,62 +304,68 @@ class Annotations:
         ]
 
 
-class FrequencyTable:
-    def __init__(self, annotations, ancestry_matrix):
-        shallow_count = annotations.get_counts()
-        self.deep_count = ancestry_matrix.get_deep_count(shallow_count)
-        self.index_dict = ancestry_matrix.index_dict
+class SpecificityCalculator:
+    """Helper class to calculate frequency (specificity) of terms."""
 
-        self.information_content = -1 * np.log10(
-            self.deep_count.sum(axis=0) / self.deep_count.sum()
-        )
-        self.ic = dict(zip(list(self.index_dict), self.information_content.tolist()[0]))
+    def __init__(
+        self, full_ancestry: Dict[str, List[str]], annotation_corpus: Type[Annotations]
+    ) -> None:
+        """Inits with ancestry dictionary.
 
-
-class AncestryMatrix:
-    """Helper class to convert ancestry dictionary into a sparse matrix."""
-
-    def __init__(self, full_ancestry):
-        """Inits with ancestry dictionary."""
-        self._assign_index(full_ancestry)
+        Parameters
+        ----------
+        full_ancestry : Dict[str, List[str]]
+            Dictionary mapping term ids to ancestor ids (traced to root)
+        annotation_corpus: onto.Annotations object
+            Dictionary mapping terms to their counts in the anno corpus
+        """
         self.full_ancestry = full_ancestry
-        self.get_matrix()
+        self.annotation_corpus = annotation_corpus
+        self._ancestry_matrix = self._get_matrix()
 
-    def _assign_index(self, full_ancestry):
-        """Assign index 0 to N to each term in the dictionary."""
-        # do I really need a method for this?
-        go_terms = list(full_ancestry)
-        indeces = list(range(0, len(go_terms)))
-        index_dict = dict(zip(go_terms, indeces))
-        self.index_dict = index_dict
+    def _get_matrix(self) -> Type[sparse.coo_matrix]:
+        """Returns sparse matrix representation of the ancestry dictionary.
 
-    def get_matrix(self):
-        """Returns sparse matrix representation of the dictionary."""
+        Returns
+        -------
+        ancestry_matrix : sparse.coo_matrix
+            matrix where cell i, j is set to 1 if terms i, j are a child-ancestor pair
+        """
         index_a = []
         index_b = []
+        term_index = dict(
+            zip(sorted(list(self.full_ancestry)), range(len(self.full_ancestry)))
+        )
         for term, ancestors in self.full_ancestry.items():
-            term_index = self.index_dict[term]
             for ancestor_term in ancestors:
-                index_a.append(term_index)
-                index_b.append(self.index_dict[ancestor_term])
-        self.matrix = sparse.coo_matrix((np.ones(len(index_a)), (index_a, index_b)))
+                index_a.append(term_index[term])
+                index_b.append(term_index[ancestor_term])
+        ancestry_matrix = sparse.coo_matrix((np.ones(len(index_a)), (index_a, index_b)))
+        return ancestry_matrix
 
-    def _encode_annotation_counts(self, term_counts):
-        """Converts dict of terms counts to a vector.
+    def _encode_annotation_counts(self) -> np.array:
+        """Creates a vector of shallow term counts.
 
-        If term i is in term_counts, then vector[i] = c,
-        and if i is not in term_counts, then vector[i] = 0.
+        For vector[i] = c, c is the number of times term i appears in the anno corpus.
         """
+        term_counts = self.annotation_corpus.get_counts()
         vector = []
-        for term in list(self.index_dict):
+        for term in sorted(list(self.full_ancestry)):
             if term in term_counts:
                 vector.append(term_counts[term])
             else:
                 vector.append(0)
         return np.array(vector).reshape(-1, 1)
 
-    def get_deep_count(self, term_counts):
-        """Count implicit number of times a term appears in the ontology."""
+    def get_full_count(self) -> np.array:
+        """Count full number of times a term appears in the ontology.
+
+        Returns
+        -------
+        full_count : np.array
+            array full_count[i] = c, where c is the number of times term i appears
+            in the anno corpus, plus all the number of times it's implied as an ancestor
+        """
         # This part is a little tricky:
         # Whenever a low-level term is assigned to a protein  it's implied that
         # the term's ancestors are assigned to the protein as well. The ancestor
@@ -358,5 +378,21 @@ class AncestryMatrix:
         # We count the number of times each term appears explicitly in the anno
         # coprus, then multiply it by the flat ancestry matrix to create a matrix
         # of complete/implied ancestry counts.
-        explicit_counts = self._encode_annotation_counts(term_counts)
-        return self.matrix.multiply(explicit_counts)
+        explicit_counts = self._encode_annotation_counts()
+        full_count = self._ancestry_matrix.multiply(explicit_counts).sum(axis=0)
+        return full_count
+
+    def get_specificity(self) -> Dict[str, float]:
+        """Calculates specificity of each term using full counts.
+
+        Returns
+        -------
+        term_specificity : Dict[str, float]
+            dictionary mapping terms to their negative log frequency (specificity)
+        """
+        full_count = self.get_full_count()
+        specificity = -1 * np.log10(full_count / full_count.sum())
+        term_specificity = dict(
+            zip(sorted(list(self.full_ancestry)), specificity.tolist()[0])
+        )
+        return term_specificity
