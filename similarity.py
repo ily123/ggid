@@ -8,118 +8,166 @@ protein-protein network for diffusion.
 import multiprocessing
 import pickle
 import time
+from typing import Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
 from scipy import sparse
 
+import onto
 
-class SimilarityCalculator:
+
+class SimilarityCalculator2:
     """Calculate Resnik similarity between proteins/entities in a set."""
 
-    def __init__(self, annotations, ontology, ft, proteins, namespace=None):
+    def __init__(
+        self,
+        annotations: onto.Annotations,
+        ontology: onto.GoGraph,
+        proteins: List[str],
+    ) -> None:
+        """Inits with annotations, GO graph, and protein list.
 
-        self.annotations = annotations.annotations
+        Parameters
+        ----------
+        annotations : onto.Annotations
+            protein annotation corpus
+        ontology : onto.GoGraph
+            Gene Ontology term graph
+        proteins : List[str]
+            list of proteins (HUGO ids) to build network for
+        """
+        self.annotations = annotations.get_as_dict()
         self.ontology = ontology
         self.proteins = proteins
-        self.ft = ft
+        self.protein_similarity = []
+        self._term_similarity = {}
 
-        self.mica = {}
-        self.ic_mica = {}
-        self.counter = 0
+    def filter_proteins(self, min_annotations: int) -> Dict[str, List[str]]:
+        """Fileters out under-annotated or missing proteins from the protein list.
 
-        self.proteins = list(set(self.annotations.DB_Object_Symbol) & set(proteins))
-        self.proteins.sort()
+        Parameters
+        ----------
+        min_annotations : int
+            min number of annotations a protein must have to be retained in the list
 
-        if namespace:
-            self.annotations = self.annotations.loc[
-                self.annotations.Aspect == namespace, :
-            ]
-
-        self.annotations2 = self.get_anno_dict(annotations.annotations)
-
-    def sanitize_protein_list(self, min_annotations=5):
-        """Removes proteins with low number of annotations."""
-
-        print(min_annotations)
-        self.proteins = [
-            p for p in self.proteins if len(self.annotations2[p]) >= min_annotations
-        ]
-
-    def get_anno_dict(self, annotations):
-        """Convert pandas df of entity->term into a dictionary."""
-        return dict(annotations.groupby("DB_Object_Symbol")["GO_ID"].apply(list))
-
-    def calculate_similarity(self):
-        """Calculate similarity for all-vs-all in the protien set."""
-
-        index_a = []
-        index_b = []
-        values = []
-        for a, protein_a in enumerate(self.proteins):
-            for b, protein_b in enumerate(self.proteins):
-                if b >= a:
-                    sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
-                    index_a.append(a)
-                    index_b.append(b)
-                    values.append(sim)
-        sim_matrix = sparse.coo_matrix((values, (index_a, index_b)))
-        self.store_sim_matrix = sim_matrix
-        self.sim_matrix = SimilarityMatrix(sim_matrix, self.proteins)
-
-
-    def calculate_similarity_two_proteins(self, protein_a, protein_b):
-        """Calculate Resnik similarity between two proteins."""
-
-        # get protein a terms
-        terms_a = self.annotations2[protein_a]
-        terms_b = self.annotations2[protein_b]
-
-        # run go terms through a all-vs-all get_mica()
-        avg = 0
-        best_mica = 0
-
-        row_micas = []
-        for term_a in terms_a:
-            row_mica = 0
-            for term_b in terms_b:
-                self.counter += 1
-                ic_mica = 0
-                if (term_a, term_b) in self.ic_mica:
-                    ic_mica = self.ic_mica[(term_a, term_b)]
-                else:
-                    ic_mica = self.get_ic_mica(term_a, term_b)
-                    self.ic_mica[(term_a, term_b)] = ic_mica
-                    self.ic_mica[(term_b, term_a)] = ic_mica
-
-                if ic_mica > row_mica:
-                    row_mica = ic_mica
-
-                if ic_mica > best_mica:
-                    best_mica = ic_mica
-        return np.array(row_micas).mean()
-
-    def get_ic_mica(self, term1, term2):
-        """Given two terms, Find IC of their  MICA.
-
-        Note:
-        IC - information content (frequency of occurance)
-        MICA - most informative common ancestor
+        Returns
+        -------
+        filtered_out : Dict[str, List]
+            dictionary of proteins that got filtered out
         """
+        # proteins not in the annotations corpus
+        present = self.is_present()
+        not_present = set(self.proteins) - set(present)
+        # proteins with insufficient annotation count
+        underannotated = [
+            p for p in self.proteins if len(self.annotations[p]) < min_annotations
+        ]
+        # proteins to keep
+        self.proteins = list(set(present) - set(underannotated))
+        filtered_out = dict(not_present=not_present, underannotated=underannotated)
+        return filtered_out
 
-        ancestors1 = self.ontology.full_ancestry[term1]
-        ancestors2 = self.ontology.full_ancestry[term2]
+    def is_present(self) -> List[str]:
+        """Returns list of proteins present in the annotation corpus.
 
-        shared = list(set(ancestors1) & set(ancestors2))
-        if len(shared) == 0:
+        Returns
+        -------
+        present : List[str]
+            subset of proteins in self.protein that is also found the annotation corpus
+        """
+        present = list(set(self.annotations) & set(self.proteins))
+        return present
+
+    def calculate_similarity(self) -> None:
+        """Calculate similarity of all protein pairs in the set."""
+        self.proteins = sorted(self.proteins)
+        protein_a_index = []
+        protein_b_index = []
+        similarity = []
+        for index_a, protein_a in enumerate(self.proteins):
+            for index_b, protein_b in enumerate(self.proteins):
+                if index_b >= index_a:
+                    sim = self.calculate_similarity_two_proteins(protein_a, protein_b)
+                    protein_a_index.append(index_a)
+                    protein_b_index.append(index_b)
+                    similarity.append(sim)
+        similarity = sparse.coo_matrix((similarity, (protein_a_index, protein_b_index)))
+        self.protein_similarity = similarity
+
+    def calculate_similarity_two_proteins(
+        self, protein_a: str, protein_b: str
+    ) -> float:
+        """Calculate Resnik (BMA) similarity between two proteins.
+
+        Parameters
+        ----------
+        protein_a : str
+            protein id (HUGO) for first protein
+        protein_b : str
+            protein id (HUGO) for second protein
+
+        Returns
+        -------
+        protein_similarity : float
+            similarity score, higher is better
+        """
+        terms_a = self.annotations[protein_a]
+        terms_b = self.annotations[protein_b]
+        # run go terms through all-vs-all similarity test
+        term_similarity = None
+        term_sim_vec = []
+        for a in terms_a:
+            for b in terms_b:
+                if (a, b) in self._term_similarity:
+                    term_similarity = self._term_similarity[(a, b)]
+                else:
+                    term_similarity = self.get_term_similarity(a, b)
+                    self._term_similarity[(a, b)] = term_similarity
+                    self._term_similarity[(b, a)] = term_similarity
+                term_sim_vec.append(term_similarity)
+        term_sim_matrix = np.array(term_sim_vec).reshape(len(terms_b), len(terms_a))
+        # do best match averaging of term similarity scores
+        best_match_a = term_sim_matrix.max(axis=0)
+        best_match_b = term_sim_matrix.max(axis=1)
+        # the BMA score is proxy for protein similarity
+        protein_similarity = np.concatenate((best_match_a, best_match_b)).mean()
+        return protein_similarity
+
+    def get_term_similarity(self, term1: str, term2: str) -> float:
+        """Given two terms, find their similarity.
+
+        Similarity is defined as the specificity of the two terms'
+        most specific common ancestor.
+
+        Parameters
+        ----------
+        term1 : str
+            id of the first GO term of interest
+        term2 : str
+            id of the second GO term of interest
+
+        Returns
+        -------
+        specificity_mica : float
+            most informative common ancestor specificity
+        """
+        if term1 == term2:
+            return self.ontology.nodes[term1].specificity
+
+        ancestors1 = self.ontology.get_full_ancestry(term1)
+        ancestors2 = self.ontology.get_full_ancestry(term2)
+        shared_ancestors = list(set(ancestors1) & set(ancestors2))
+        if len(shared_ancestors) == 0:
             return 0
-        most_specific = self.ft.ic[shared[0]]
-        # most specific has smallest absolute IC value
-        for ancestor in shared:
-            if self.ft.ic[ancestor] > most_specific:
-                most_specific = self.ft.ic[ancestor]
-
-        return most_specific
+        if len(shared_ancestors) == 1:
+            return self.ontology.nodes[shared_ancestors[0]].specificity
+        specificity_mica = 0
+        for ancestor in shared_ancestors:
+            specificity_mica = max(
+                specificity_mica, self.ontology.nodes[ancestor].specificity
+            )
+        return specificity_mica
 
 
 class SimilarityMatrix:

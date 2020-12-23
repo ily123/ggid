@@ -68,8 +68,6 @@ class GoGraph:
     ----------
     nodes : Dict
         dictionary of nodes in the graph, addressed by id
-    full_ancestry : Dict[List]
-        dictionary of term -> term ancestors traced to the root
     """
 
     def __init__(self, obo_fp: str) -> None:
@@ -302,6 +300,10 @@ class Annotations:
         self.annotations = self.annotations.loc[
             self.annotations.Aspect == keep_namespace, :
         ]
+
+    def get_as_dict(self) -> Dict[str, List[str]]:
+        """Returns annotations as protein->terms dict."""
+        return dict(self.annotations.groupby("DB_Object_Symbol")["GO_ID"].apply(list))
 
 
 class SpecificityCalculator:
