@@ -17,7 +17,7 @@ from scipy import sparse
 import onto
 
 
-class SimilarityCalculator2:
+class SimilarityCalculator:
     """Calculate Resnik similarity between proteins/entities in a set."""
 
     def __init__(
