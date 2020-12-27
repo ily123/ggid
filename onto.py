@@ -81,6 +81,7 @@ class GoGraph:
         # keep track of all nodes using a dictionary
         self.nodes = {}
         self.obo_fp = obo_fp
+        self._full_ancestry = {}
 
     def parse_ontology(self) -> None:
         """Parses the .obo file."""
@@ -203,7 +204,12 @@ class GoGraph:
             ancestors : list
                 list of acestor GO term ids
         """
-        return list(set(self.traverse(node_id)))
+        if node_id in self._full_ancestry:
+            return self._full_ancestry[node_id]
+        else:
+            full_ancestry = list(set(self.traverse(node_id)))
+            self._full_ancestry[node_id] = full_ancestry
+            return full_ancestry
 
     def calculate_term_specificity(
         self, annotations: Type["Annotations"]
