@@ -1,14 +1,11 @@
-print("reloaded")
 """
 Calculates GO term similarity between a set of proteins to
 produce a similarity matrix, which can then be converted into a
 protein-protein network for diffusion.
 """
 
-import multiprocessing
 import pickle
-import time
-from typing import Dict, List, Type, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -17,7 +14,7 @@ from scipy import sparse
 import onto
 
 
-class SimilarityCalculator:
+class Calculator:
     """Calculate Resnik similarity between proteins/entities in a set."""
 
     def __init__(
@@ -170,76 +167,111 @@ class SimilarityCalculator:
         return specificity_mica
 
 
-class SimilarityMatrix:
+class Network:
     """Similairity matrix and its protein ids."""
 
-    def __init__(self, raw_similarity, proteins):
-        """Inits the similarity matrix container.
+    def __init__(
+        self, protein_similarity: sparse.coo_matrix, proteins: List[str]
+    ) -> None:
+        """Inits the similarity matrix/network container.
 
         Parameters
         ----------
-        raw_similarity : numpy 2d array
+        protein_similarity : scipy sparse matrix
             Matrix containing protein-protein GO term similarity scores, so that
-            raw_similarity[i, j] contains similarity score for proteins i and j.
+            protein_similarity[i, j] contains similarity score for proteins i and j
 
         proteins : list[str]
-            List of proteins in the matrix, sorted so that
-            row (column) i in raw_similarity corresponds to protein[i].
+            List of proteins in the matrix, so that proteins[i] corresponds to
+            row (column) i in protein_similarity matrix
         """
-
-        self.raw_similarity = raw_similarity + raw_similarity.T
-        self.raw_similarity = self.raw_similarity.todense()
-        np.fill_diagonal(self.raw_similarity, 0)
+        self.protein_similarity = protein_similarity + protein_similarity.T
+        self.protein_similarity = self.protein_similarity.todense()
+        np.fill_diagonal(self.protein_similarity, 0)
         self.proteins = proteins
+        self.network = None
 
-    def get_protein_name_by_index(self, protein_index):
-        """Get protein name given it's position (index) in network matrix."""
-
-        return self.proteins[protein_index]
-
-    def get_protein_index(self, protein_name):
-        """Get protein index (position) in network matrix given protein's name."""
-
-        if protein_name not in self.proteins:
-            return None
-        else:
-            return self.proteins.index(protein_name.upper())
-
-    def get_similarity_vector_for_protein(self, protein_name):
-        """Given a protein return it's similarity to other proteins in network."""
-
-        protein_index = self.get_protein_index(protein_name)
-        if protein_index:
-            similarity_vector = self.raw_similarity[protein_index, :].tolist()[0]
-            return pd.DataFrame(
-                {"protein": self.proteins, "similarity_score": similarity_vector}
-            )
-        else:
-            return None
-
-    def threshold_matrix(self, n=None):
-        """Converts similarity matrix into a network.
-
-        For each protein, sets its N most similar connections to 1,
-        and zero-outs the rest.
+    def get_protein_name_by_index(self, protein_index: int) -> str:
+        """Get protein name given its position (index) in network matrix.
 
         Parameters
         ----------
-        n : int
-            Number of edges to keep for each protein,
-            sqrt(network_size) by default.
+        protein_index : int
+            index of protein in the network
 
         Returns
         -------
-        network : scipy.sparse.coo.coo_matrix
-            An adjacency matrix of 1s and 0s, where 1
-            denotes a connection between two protein.
+        protein : str
+            string name of the protein
         """
+        protein = self.proteins[protein_index]
+        return protein
 
-        if not n:
+    def get_protein_index(self, protein_name: str) -> int:
+        """Get protein index (position) in network matrix given protein's name.
+
+        Parameters
+        ----------
+        protein_name : str
+            string name of the protein
+
+        Returns
+        -------
+        protein_index : int
+            index of protein in the network
+
+        Raises
+        ------
+        ValueError
+            if protein name not found in network
+        """
+        if protein_name not in self.proteins:
+            raise ValueError("Protein %s not found in network." % protein_name)
+        protein_index = self.proteins.index(protein_name.upper())
+        return protein_index
+
+    def get_similarity_vector_for_protein(self, protein_name: str) -> pd.DataFrame:
+        """Given a protein return it's similarity to other proteins in network.
+
+        Parameters
+        ----------
+        protein_name : str, None
+            string name of the protein
+
+        Returns
+        -------
+        similarity_vector: pd.DataFrame
+            pandas df mapping similarity of query protein to other
+            proteins in network
+        """
+        protein_index = self.get_protein_index(protein_name)
+        similarity_scores = self.protein_similarity[protein_index, :].tolist()[0]
+        similarity_vector = pd.DataFrame(
+            {"protein": self.proteins, "similarity_score": similarity_scores}
+        )
+        return similarity_vector
+
+    def threshold_matrix(self, n: Union[int, None] = None) -> None:
+        """Drops low-similarity edges to create network.
+
+        For each protein, sets its n most similar connections to 1,
+        and sets all others to 0.
+
+        Parameters
+        ----------
+        n : int, optional
+            Number of edges to keep for each protein,
+            sqrt(network_size) by default. Default: sqrt of the network size.
+
+        Returns
+        -------
+        network : scipy.sparse.coo_matrix
+            An adjacency matrix of 1s and 0s, where 1
+            denotes a connection between two proteins.
+        """
+        if n is None:
             n = np.ceil(np.sqrt(len(self.proteins)))
-        n = int(n)
-        adj_matrix = self.raw_similarity.copy()
+        adj_matrix = self.protein_similarity.copy()
         net_size = len(self.proteins)
         top_n_edge_cutoff = np.partition(adj_matrix, net_size - n, axis=1)[
             :, net_size - n
@@ -247,29 +279,42 @@ class SimilarityMatrix:
         mask_top_n_edge = adj_matrix >= top_n_edge_cutoff
         adj_matrix[mask_top_n_edge] = 1
         adj_matrix[~mask_top_n_edge] = 0
-        self.adj_matrix = adj_matrix
+        self.network = adj_matrix
 
-    def enforce_adj_matrix_symmetry(self):
+    def enforce_network_symmetry(self) -> None:
         """Updates the adjacency matrix to be symmetric about the diagonal."""
+        if self.network is None:
+            raise ValueError("Network is None. Did you threshold the matrix?")
+        symmetric_network = self.network + self.network.T
+        symmetric_network[symmetric_network > 0] = 1
+        self.network = symmetric_network
 
-        symmetric_adj_matrix = self.adj_matrix + self.adj_matrix.T
-        symmetric_adj_matrix[symmetric_adj_matrix > 0] = 1
-        self.adj_matrix = symmetric_adj_matrix
+    def get_edges_for_protein(self, protein: str) -> List[str]:
+        """Gets a list of proteins that the query protein is connected to.
 
-    def get_edges_for_protein(self, protein):
-        """Gets a list of proteins that the query protein is connected to."""
+        Parameters
+        ----------
+        protein : str, None
+            string name of the protein
 
+        Returns
+        -------
+        edge_names : List[str]
+            list of protein's edges
+        """
+        if self.network is None:
+            raise ValueError("Network is None. Did you threshold the matrix?")
         protein_index = self.get_protein_index(protein)
-        edge_indices = self.adj_matrix[protein_index, :].nonzero()[1].tolist()
+        edge_indices = self.network[protein_index, :].nonzero()[1].tolist()
         edge_names = [self.get_protein_name_by_index(i) for i in edge_indices]
         return edge_names
 
-    def save_as_pickle(self, save_path):
+    def save_as_pickle(self, save_path: str) -> None:
         """Pickles self to a given file path.
 
         Parameters
         ----------
         save_path : str
-            Desired file path of the output pickle file.
+            file path to dump the pickle
         """
         pickle.dump(self, open(save_path, "wb"))
