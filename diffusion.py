@@ -43,12 +43,12 @@ class Diffusion:
 
     def diffuse(self):
         """Diffuses information from input nodes across the graph."""
-        lpp = sparse.csgraph.laplacian(self.network.adj_matrix)
+        lpp = sparse.csgraph.laplacian(self.network.network)
         alpha = 1 / float(np.max(np.sum(np.abs(lpp), axis=0)))
-        ident = sparse.csc_matrix(np.eye(self.network.adj_matrix.shape[0]))
+        ident = sparse.csc_matrix(np.eye(self.network.network.shape[0]))
         ps = ident + alpha * lpp
 
-        initial_state = np.zeros(self.network.adj_matrix.shape[0])
+        initial_state = np.zeros(self.network.network.shape[0])
         input_indices = self.get_node_indices(self.input_nodes)
         initial_state[input_indices] = 1
 

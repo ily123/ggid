@@ -271,6 +271,7 @@ class Network:
         """
         if n is None:
             n = np.ceil(np.sqrt(len(self.proteins)))
+        n = int(n)  # keep this line! if n is a float, numpy throws an error
         adj_matrix = self.protein_similarity.copy()
         net_size = len(self.proteins)
         top_n_edge_cutoff = np.partition(adj_matrix, net_size - n, axis=1)[
