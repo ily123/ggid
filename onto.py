@@ -400,6 +400,7 @@ class SpecificityCalculator:
         """
         full_count = self.get_full_count()
         specificity = -1 * np.log10(full_count / full_count.sum())
+        specificity[specificity == np.Infinity] = 0  # terms with 0 annos
         term_specificity = dict(
             zip(sorted(list(self.full_ancestry)), specificity.tolist()[0])
         )
