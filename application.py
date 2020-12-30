@@ -136,7 +136,7 @@ def get_network_elements(network):
     # add all proteins and their edges to the view
     elements = []
     protein_name = network.proteins
-    nodes_i, nodes_j = network.adj_matrix.nonzero()
+    nodes_i, nodes_j = network.network.nonzero()
     # iterate over all edges
     for index, node_i_index in enumerate(nodes_i):
         node_j_index = nodes_j[index]
