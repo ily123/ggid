@@ -97,3 +97,7 @@ td, th {
 tr:nth-child(odd) {
   background-color: #dddddd;
 }
+
+img[alt=graphical_abstract] {
+    width: 700px;
+}

@@ -183,34 +183,22 @@ tabs = {
         like RNAs).
 
 
-        ### Does this tool actually predict novel associations? (Limitations)
+        ### Does this tool actually work for predicting novel associations? (Limitations)
         ---
 
-        This tool is good at presenting existing GO term information as a protein graph,
-        and cross-validation across multiple label sets is pretty decent with AUCs > 0.80.
-        However, prediction of
+        This tool is good at presenting networks of existing information, and cross-validation
+        across multiple label sets is pretty decent > 0.80. However, prediction of
         future interactions, as measured by retrospective validation, is not as impressive.
         Retrospective validation produces AUCs for best label cases in the range of 0.6-0.7.
         (You can see these data in Chapter 3 of my thesis.) Forward validation lagging
         behind cross-validation is a sign of overtraining.
 
-        Why does the GO network overtrain? I think this is because GO term annotations
-        are fairly discrete. That is, if a protein has no terms linking it to a specific process,
-        the model is dead in the water. It has no date to reason with. So for
-        annotation of truly orphan proteins, GO term networks, as presented here,
-        are not that useful. For underannotated proteins, it's better to use intrinsic
-        properties like primary sequence or structure (something that can also be made
-        into networks).
+        Why does this network overtrain? I think this is because GO term information
+        is fairly discrete. If a protein has no terms linking it to a specific process,
+        the model is dead in the water, because it has nothing to reason with. 
 
-        In summary:
-
-        In the worst case scenario, you can use this tool as an engaging way to look at
-        GO term information. In the best case scenario, you can use it to predict
-        novel associations. See the EXAMPLE tab for a fully worked example of how to
-        actually use the tool.
-
-        Finally, feel free to take my code and plug in your own networks. If
-        I had more time to work on this, that's probably where I'd take this tool.
+        Anyway, worst case scenario, you can use this tool as an engaging way to look at
+        GO term information. Feel free to also take my code and plug in other networks.
         """,
     "example_tab": """
         ### Typical usecase
