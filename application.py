@@ -196,14 +196,24 @@ def get_cluster_elements(network, input_proteins, top_hits, diffusion_result):
 
 def create_cytoscape_div(network, labels, diffusion_result, zscore_cutoff):
     """Constructs updated cytoscape div."""
+    # regardless of experiment type, we want to show all label nodes
+    # plus all the top-scoring unlabeled nodes
     top_hits = diffusion_result[diffusion_result.zscore >= zscore_cutoff]
     top_hits_nodes = list(top_hits.protein.values)
     graph_elements = get_cluster_elements(
         network, labels, top_hits_nodes, diffusion_result
     )
-    # determine if experiment was a LOO cross val
+    # however, the coloring of the nodes needs to be handled differently
+    # based on experiment type (if it's LOO we want gradient applied to labels too)
     is_loo = len(network.proteins) == len(diffusion_result)
-    graph_style = get_cyto_stylesheet(top_hits, is_loo)
+    if is_loo:
+        labels_result = diffusion_result[diffusion_result.initial_state == 1]
+        top_hits_and_labels = pd.concat([top_hits, labels_result])
+        # to get an even gradient, rerank within the set
+        top_hits_and_labels["rank"] = top_hits_and_labels["rank"].rank()
+        graph_style = get_cyto_stylesheet(top_hits_and_labels, is_loo)
+    else:
+        graph_style = get_cyto_stylesheet(top_hits, is_loo)
     return graph_elements, graph_style
 
 
@@ -253,6 +263,9 @@ def get_colors(diffusion_result):
         1 - diffusion_result["rank"] / len(diffusion_result)
     )
     color_dict = dict(zip(diffusion_result.protein, colors))
+    print(diffusion_result)
+    print(diffusion_result["rank"])
+    print(color_dict)
     return color_dict
 
 
