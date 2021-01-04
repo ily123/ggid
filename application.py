@@ -300,7 +300,7 @@ def get_main_tab():
         html.Div(
             dbc.Textarea(
                 id="input-kinase-list",
-                placeholder="Enter kinase IDs in HUGO format (ex: CDC7, AURAB)",
+                placeholder="Enter kinase IDs in HUGO format (ex: CDC7, AURKB)",
                 value="CDK1, CDC7",
             ),
         ),
