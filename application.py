@@ -527,6 +527,7 @@ def validate_inputs(n_clicks, protein_list):
     # diffusion switch, by default, is set to return no-update signal (ie: do nothing)
     diffusion_switch = dash.no_update
     proteins = re.findall("\w+", protein_list)
+    proteins = [protein.upper() for protein in proteins]
 
     if len(proteins) == 0:
         message.append(
