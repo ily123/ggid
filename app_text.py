@@ -50,9 +50,9 @@ tabs = {
         Proteins don't work in isolation. They work together and form networks.
 
         In practice, this means that once you've identified a protein associated with some critical
-        process (commonly, a disease), you can query that protein's network to find
+        process, you can query that protein's network to find
         additional proteins that are involved in the same process.
-        This allows you to expand the candidate list of theraupetic targets, and arrive at
+        In case of disease, this allows you to expand the candidate list of theraupetic targets, and arrive at
         a cure faster.
 
         Construction of protein networks, and learning from them, is one of the
@@ -62,13 +62,15 @@ tabs = {
         you can find protein networks for many species, and for a variety of underlying data (physical
         interactions, high-throughput co-expression experiments, implied functional association, text mining, etc).
 
-        In this dashboard, I present a new approach for creating protein networks,
-        using GO terms from the [Gene Ontology](https://geneontology.org/) database.
-        Below I explain how to build GO term networks, and how to use them to predict
-        useful protein associations. Also, see the graphical abstract below:
+        In this dashboard, I present a new approach for creating protein networks that is
+        complementary to STRING.
+        I use data from the [Gene Ontology](https://geneontology.org/) database to
+        create GO similarity networks. I then apply information diffusion to the network
+        to find clusters of connected proteins. Below I explain the methodology.
 
+        For a complete example for using the dashboard, see the EXAMPLE tab.
 
-        ### Gene Ontology term similarity network
+        ### Gene Ontology (GO) similarity network
         ---
 
         [Gene Ontology](http://geneontology.org/) database is to proteins what the [IMDB](https://www.imdb.com)
@@ -79,29 +81,31 @@ tabs = {
         and so on. These labels are  known as "GO terms" and they describe a protein's
         job within the cell. Because proteins that do
         similar jobs have similar GO terms, GO term similarity can be readily
-        converted into a network/graph, and that's what we do here.
+        converted into a network/graph (which we we can then learn from).
 
-        To build a protein network from GO term similiarity, we follow these steps:
+        To build a protein network from GO terms, we follow these steps:
 
         1. Given a set of proteins, we measure GO term similariy between each possible pair
-         of proteins in the set. This step has a few components:
-            * GO term similarity between two proteins is defined as the average similarity
-            between their GO terms.
+         of proteins in the set. To measure GO term similarity between two proteins, we
+         do the following:
+            * We define GO term similarity of two proteins as the average similarity
+            of their GO terms.
             * Similarity between two GO terms ```q``` and ```w``` is the specificity of
             their most informative common ancestor (```MICA```):
 
             ![equation](https://latex.codecogs.com/gif.latex?similarity(q,w)&space;=&space;specificity(MICA))
 
-            * What is an ancestor GO term? GO terms are not just flat labels. GO terms
+            * What is an ancestor GO term?
+
+            GO terms are not just flat labels. GO terms
             are related to each other and are organized in a tree, where each term
-            has ancestors and children. Ancestor terms are the more general, while
-            children terms are more specific. For example, ```Signaling``` is a
-            general high-level term. One of its children is ```Kinase signaling```.
-            A child of ```Kinase signaling``` is someting like ```P53 signaling```, and so on.
+            has ancestors and children. Ancestor terms are more general and high-level, while
+            children terms are more specific and low-level. For example, ```Signaling``` is a
+            general high-level term, and one of its children is the more specific ```Kinase signaling```.
             The child-ancestor relationships branch out with ancestors having multiple
             children.
 
-             So given two terms, we can trace their ancestry and find common ancestor
+             Thus, given two terms, we can trace their ancestry and find common ancestor
              terms.
 
             * Once we find the shared ancestor terms, how do we decide which is the
@@ -112,7 +116,8 @@ tabs = {
 
             In the equation above, ```n``` is the number of times that term ```a``` has ever
             been annotated to a protein, while ```N``` is the total number of all annotations
-            ever made. So ```n/N``` is simply the frequency of term in in the annotation
+            made. (Note that when we assign a GO term to a protein, we refer to it as an
+            annotation, i.e. we annotate a protein with a GO term.) So ```n/N``` is simply the frequency of term in the annotation
             corpus. To make things more intuitive, we convert frequency into a positive
             number by taking a negative log of it (smaller frequency corresponds to higher negative log number).
 
@@ -120,91 +125,112 @@ tabs = {
             This is because terms lower in the tree are used less frequently, and are more specific.
 
             * To arrive at a final similarity score for two proteins, we measure the
-            similarity of their GO terms (again, every possible pair), and take the
+            similarity of their GO terms (for every possible GO term pair), and take the
             Best Match Average (BMA) of the individual GO term similarity scores. (In BMA, rather
             than do a mean over all go term pairs, we instead select the highest score for each term
-            and average those.) The BMA score of the terms is the similarity score for the two proteins.
+            and average those.) The BMA GO term similarity score is the similarity score for the two proteins.
 
 
-        2. Once we have completed the all-vs-all protein comparison, as described above,
-        we have a similarity matrix. To convert it into a network, we go trough each
-        protein and set its 5 most similar partner proteins as edges, while discrading
-        everything else. This produced a protein graph where each protein is connected
-        to 5 proteins that it is most similar to. (In memory, this is simply a sparse
-        matrix where edges are denoted as 1.)
+        2. Once we have computed similarity for every protein pair in the set,
+        we have a similarity matrix. In this matrix, higher scores correspond to pairs
+        of highly-similar proteins, while low scores correspond to proteins that are
+        dissimilar. To convert the matrix into a graph, we go trough each
+            protein (ie column/row in the matrix) and set the top 5 of its most similar
+            partner proteins as edges, and discrad all other pairs. This produced a protein
+            graph where each protein is connected to 5 proteins that it is most similar to.
 
-        3. To derive meaningful info from this network, we use information diffusion
+        3. To learn from this network, we then use information diffusion
         as described below.
 
-        ### Diffusion
+        ### Graph Information Diffusion
         ---
 
         To extract information from the network, we can simply examine it by hand. Given a protein, what
-        are its closest neighbors? This works, but gets out of hand quickly when you
-        want to examine more than just a single protein. It's a bit hard to integrate
-        information by hand when you have, for example, a set of 10 proteins that are involved
-        in some process. You would want some an algorithmic metric to measure
-        how well the 10 proteins connect to the rest of the network. The well-validated
-        algorithm I use in this dashboard is Information Diffusion.
+        are its closest neighbors? This works, but in practise gets out of hand quickly
+        when you want to examine more than a single protein at the same time, or when the number of edges
+        is too high. So it's best to use an algorithmic approach, such as Information
+        Diffusion.
 
         Intuitively, Information Diffusion is exactly what it sounds like. We label
-        some nodes with information, then let information diffuse accross
-        the network. At the end of the diffusion experiment, nodes that retain the
+        some nodes in the network with information, then let information diffuse to other
+        nodes using edges as conduits. At the end of the diffusion experiment, nodes that retain the
         most information are the ones that are most
         closely connected to the original labeled nodes.
 
         Using this method, we can discover clusters of proteins that do the same job.
-        For example, label in the network all proteins associated with disease X, diffuse
-        that label, rank unlabled proteins by the amount of information they retained.
-        Proteins at the top of the list are those most likely to be also involved in
-        disease X.
+        For example, label all proteins associated with ```disease X```, diffuse
+        that label, and measure amount of information in each node post diffusion.
+        Rank the originally unlabled nodes by the amount of information they retained.
+        Proteins at the top of the ranked list are likely to be involved in
+        ```disease X```.
 
-        The formal formal definition of diffusion see this excerpt from
+        For formal mathematic definition of diffusion see the methods section
+        of [this paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3001439/).
+
+        ---
+        However, here is a quick summary from someone who isnt that great at linear
+        algebra:
+
+        Diffusion of labels can be set up as a quadratic function H:
 
         ![equation](https://latex.codecogs.com/gif.latex?H&space;=&space;\sum_{i}(y_{i}-f{i})^{2}&space;&plus;&space;\\alpha&space;\sum_{i,j}G_{ij}(f_{i}-f_{j})^{2})
 
+        where ```y``` is the initial label vector (```y(i) = 1``` for a protein carrying the
+        label, and ```0``` otherwise), and ```f``` is the final label vector post-diffusion.
+        The goal is to minimize H by balancing the two counter-acting terms:
 
-        ### Kinase Network as Testbed
+        * The first term ```(y-f)``` represents loss of inital label, and we
+            want to minimize it (eg the originally-labeled nodes need to retain most of
+            their label).
+
+        * The second term ```f(i) - f(j)``` represents the difference in label state
+            of connected nodes (```G(i,j)``` is our graph, where ```G(i,j)=1``` if the two nodes
+            are connected and ```0``` otherwise). To minimize this term, we want to ensure
+            that label information is distributed smoothly over the network. To promote
+            smoothing, we can modulate constant ```alpha```.
+
+        Given this linear system, we can solve for ```f``` using the graph diffusion
+        kernel. In practise,```f``` is the
+        post-diffusion "information content" of the node, and we use it as a measure
+        of the node's connectedness to the orignal site of the label.
+
+        ### Kinase network as model system
         ---
 
-        So it's all coming togther. We are (1) building a network out of
-        GO terms, and (2) using diffusion to find clusters of related proteins.
+        So far, we have explained how to (1) build a network out of
+        GO terms, and how to (2) use diffusion to find clusters of connected proteins within the network.
 
-        What proteins should we apply this methodology to? For demo purposes,
-        this dashboard uses a network of 327 human kinases:
+        To test this approach, I chose to model the network of the human kinome. I chose
+        to limit things to the kinome for the following reasons:
 
-        * I wasn't sure the browser can render a full network of 20,000 human proteins
-        * Meanwhile, the number of kinases is realtively small (just 500),
-        so they are easy to model
-        * Plus, kinases are very important in human disease (they drive signaling
-        by phosphorylating other proteins), and as a result well-studied and annotated
+        * I wasn't sure the browser can render a full network of 20,000 human proteins.
+        * Kinases are important to human disease, and are relatively well-studied and annotated
 
-        You can apply the framework described here to the entire human proteome (or other actors
-        like RNAs).
+        The network of 327 human kinases (the ones with at least 10 GO terms) is the
+        network used in this dashboard. You can diffuse labels between nodes in this
+        network to find kinases that are potentially connected.
 
-
-        ### Does this tool actually predict novel associations? (Limitations)
+        ### Does this tool actually predict novel associations? (Validation & Limitations)
         ---
+        Some of the kinase network validation can be found in Chapter 3 of [my thesis](https://github.com/ily123/thesis).
+        To summarize my findings:
 
-        This tool is good at presenting existing GO term information as a protein graph,
-        and cross-validation across multiple label sets is pretty decent with AUCs > 0.80.
-        However, prediction of
-        future interactions, as measured by retrospective validation, is not as impressive.
+        * Cross-validation across multiple label sets is pretty decent with AUCs > 0.80.
+        This shows that the tool is good at modeling existing GO term information as a protein graph.
+
+        * However, prediction of future interactions, as measured by retrospective validation, is not as impressive.
         Retrospective validation produces AUCs for best label cases in the range of 0.6-0.7.
-        (You can see these data in Chapter 3 of my thesis.) Forward validation lagging
-        behind cross-validation is a sign of overtraining.
+        * Hold-out validation lagging behind cross-validation is a sign of overtraining.
 
         Why does the GO network overtrain? I think this is because GO term annotations
-        are fairly discrete. That is, if a protein has no terms linking it to a specific process,
-        the model is dead in the water. It has no date to reason with. So for
+        are binary. That is, if a protein has no terms linking it to a specific process,
+        the model has no data to build connections with. For
         annotation of truly orphan proteins, GO term networks, as presented here,
         are not that useful. For underannotated proteins, it's better to use intrinsic
         properties like primary sequence or structure (something that can also be made
         into networks).
 
-        In summary:
-
-        In the worst case scenario, you can use this tool as an engaging way to look at
+        So in the worst case scenario, you can use this tool as an engaging way to look at
         GO term information. In the best case scenario, you can use it to predict
         novel associations. See the EXAMPLE tab for a fully worked example of how to
         actually use the tool.
