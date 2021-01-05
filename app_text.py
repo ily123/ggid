@@ -240,31 +240,51 @@ tabs = {
         """,
     "example_tab": """
         ### Typical usecase
-        The goal of the GGID tool is to find clusters of closely connected kinases.
+        The goal of the GGID tool is to find clusters of closely connected kinases
+        within the GO-term similarity network of the human kinome.
 
-        Let's say you are interested in the protein P53. It's central to several cancers,
-        and interacts with many kinases. You read the literature and realize that interaction
-        of P53 with its kinases is critical to several cancers.
+        When would you want to do that? Here is a typical scenario:
 
-        In addition to any kinases you already know about,
-        you want to find any additional kinases that may interact with P53. So your hypothesis
-        becomes:
+        Let's say you are interested in the protein P53, because it's involved in a
+        cancer you care about. You read the literature on P53 and realize that it
+        interacts with many kinases, and these interactions are critical to disease
+        progression. So you decide to test whether any of these kinase interactions
+        can be attenuated by drugs.
 
+        However, before you embark on your drug screen, you wonder if your list of P53
+        kinases (the one you got from the literature) is complete. Are there any
+        other putative P53 kinases not known to science that you could test?
+
+        To answer this question, you can use the GGID tool!
+        The basic hypothesis the tool provides for you is:
         ```
-        Close network neigbors of P53 kinases are also P53 kinases.
+            Within the network of human kinases, neighbors of P53 kinases are also P53 kinases.
         ```
+        Given a set of input kinases (in this case, known P53 kinases), the tool
+        ranks every other kinase in the network based on how well they are connected
+        to the input set (using a method called Information Diffusion, see THEORY tab).
+        Kinases at the top of this ranked list are,
+        hypothetically, P53 kinases. After you test them for P53 phosphorylation
+        activity to verify that they are indeed P53 kinases (which in itself is a major
+        contritubtion to the field), you can include them in your drug screen.
 
-        Here is how to generate a list of these putative neigbors using my tool:
+        Before I go through the procedure for using this tool, I'd like to emphasize
+        that the tool is completely generic. In this example, we are using P53 kinases,
+        but list of input kinases can be any set of kinases that you think are relevant
+        to your question.
 
-        ---
+        ### How to use the tool
 
         **Step 1: Come up with a list of known P53 kinases.**
 
-        You can do it by reading literature or using a database like [Phosphosite](www.phosphosite.org). In this
-        case, lets skip over to [P53's page on Phoshosite](https://www.phosphosite.org/proteinAction.action?id=465&showAllSites=true)
+        Before you start, you need to identify the list of known positives, i.e. known
+        P53 kinases.
+
+        You can do it by reading literature or using a database like [Phosphosite](www.phosphosite.org).
+        For the purposes of this demo, let's skip over to [P53's page on Phoshosite](https://www.phosphosite.org/proteinAction.action?id=465&showAllSites=true)
         and then go the *Upstream* tab. This tab lists all upstream regulators of P53.
         One of the categories in the tab is *Kinases, in vitro*. This is the list of
-        kinases that phosphorylate P53 in the test tube. Here is the list:
+        kinases that are known to phosphorylate P53 in the test tube. Here is the list:
         ```
         ATM, ATR, AurA, AurB, Btk, CDK1, CDK4, CDK5, CDK9, Chk1, Chk2, CK1A, CK2B,
         DAPK1, DNAPK, DYRK1A, DYRK2, ERK1, ERK2, GRK5, HIPK2, JNK1, JNK2, LKB1, LRRK2,
@@ -273,46 +293,58 @@ tabs = {
 
         ---
 
-        **Step 2: Enter data and conduct diffusion experiment:**
+        **Step 2: Enter known kinases and conduct diffusion experiment (with corss-validation):**
 
         Paste the kinase list into the text box, check cross-validation, and press the
         DIFFUSE button.
 
-        ![alt text](assets/screenshot_2.png)
+        ![alt text](assets/example/example_pic1.png)
+
+        The cross-validation option is important, and should always be checked if your
+        input set is larger than 1 protein. It conducts a cross-validation experiment
+        on your input label set. We will discuss cross-validation in more detail below.
 
         ---
 
         ** Step 3: Analyze initial results:**
 
         The output of the diffusion experiment is the list of proteins ranked by how
-        closely they are connected to the input label set. By default all proteins
-        ranked with zscore of 2 or more are plotted on the graph (you can adjust this
-        value in the input form).
+        closely they are connected to the input label set (measured as label z-score, see
+        THEORY for details). By default all proteins with zscore >= 2 are plotted on the graph.
 
         So here is what the network of our top hits looks like now:
 
-        ![alt text](assets/screenshot_3a_circle.png)
+        ![alt text](assets/example/example/resized-example_pic2.png)
 
-        The diamonds are the orignal input labels, and circles are the top hits.
-        Color of the circle corresponds to the z-score. You can view exact ranks and
-        z-scores in the table below the graph (not shown here).
+        Diamonds are the orignal input label set, and circles are the top hits. Color
+        of the node corresponds to their rank/z-score. You can view z-score of each
+        protein by clicking on it, and the z-score and rank will be displayed in the table
+        below the main graph. For example, CDK2:
 
-        The circular layout is not super informative, so click on Force-directed layout.
+        ![alt text](assets/example/resized-example_pic3.png)
+
+        Meanwhile, the circular layout is not super informative, so click on Force-directed layout.
         The result will look something like this:
 
-        ![alt text](assets/screenshot_3b_force_dir.png)
+        ![alt text](assets/example/resized-example_pic4.png)
 
         The graph looks like a bit of a mess, but we begin to see some separation between
         nodes.
 
-        However, for now, let's focus on two things:
+        For now, let's focus on two things:
 
 
-        * There are some input labels not connected to anything (boxed in red).
-        Why is that? Well, the input set is pretty broad, there are multiple proteins
-        so there could be several clusters. The proteins that don't cluster to anything
-        are either under annotated, or simply don't connect well to the other labels.
+        * There are some input labels, boxed in red, not connected to the main cluster.
+        Because they are not connected to the rest of the input set, they have fairly
+        low cross-validation ranks, especially SRC, PAK4 (tied for rank=313), and BTK (rank=306).
+        This is exactly what we would expect from disconnected proteins -- they are not
+        predicted by the rest of the input set.
 
+         Why are they disconnected? It's possible that they are underannoated (and thus
+        don't have strong connections to the more well-annotated proteins in the set),
+        or they are part of a separate cluster. The input set of P53 proteins is quite
+        large, and it's likely that there are multiple subclusters, poorly connected
+        to the main cluster, of which PAK4 and SRC are a part of.
 
         * The metric of how good the labels connect to each other is the cross-validation
         AUC. You can read about cross-validation in detail [here](https://en.wikipedia.org/wiki/Cross-validation_(statistics)#Leave-one-out_cross-validation).
@@ -327,78 +359,52 @@ tabs = {
         connected, the our input set is not informative. It's just a collection of unconnected
         proteins!
 
-        Right now, our AUC is not very high. It's 0.61, meaning the lables are somewhat
-        connected, but there is a lot of noise. We can work with the list of the top
+        Right now, AUC=0.77, meaning the lables are somewhat
+        connected, but there is some noise. We can work with the list of the top
         hits, but let's try to fine-tune our inputs.
 
         ---
 
-        **Step 3b (optional): Adjust the inputs to improve cross-validation performance**
+        **Step 4: Adjust the inputs to improve cross-validation performance**
 
-        We have some unconnected proteins in the network. Let's go ahead and get rid
-        of them. In this example, those proteins are BTK, CDK9, NEK2, PAK4 and PLK3.
-        Remove them from the input set and rerun the experiment.
-
-        New input set:
+        We have 3 unconnected proteins in the network (SRC, PAK4, and BTK). Let's remove
+        them from the input set and rerun the experiment. The new input set is below:
 
         ```
-        ATM, ATR, AurA, AurB, CDK1, CDK4, CDK5, Chk1, Chk2, CK1A, CK2B,
+        ATM, ATR, AurA, AurB, CDK1, CDK4, CDK5, CDK9, Chk1, Chk2, CK1A, CK2B,
         DAPK1, DNAPK, DYRK1A, DYRK2, ERK1, ERK2, GRK5, HIPK2, JNK1, JNK2, LKB1, LRRK2,
-        MAPKAPK5, NuaK1, P38A, P38G, PKCD, PRPK, SMG1, Src, TAF1, VRK1
-
+        MAPKAPK5, NEK2, NuaK1, P38A, P38G, PKCD, PLK3, PRPK, SMG1, TAF1, VRK1
         ```
-        Re-run the experiment. The results will look like so:
-        ![alt text](assets/screenshot_3c_iteration1.png)
+        The results will look like so:
+        ![alt text](assets/example/resized-example_pic5.png)
 
-        The basic connectivity of the major cluster hasn't changed, but the isolated
-        labels no longer introduce noise into the experiment. (And because we excluded
-        those labels from the analysis, the cross-validation performance of the
-        remaining labels improved to AUC=0.73.)
-
-        From here, we can continue excising proteins that are not clearly connected
-        to a cluster. Two prime targets are SRC and LRRK2. In the image below, I dragged
-        them out of the hairball to show how many connections they have:
+        Because the isolated labels no longer introduce noise into the experiment,
+        the AUC is now at a respectable 0.91. Additionally, there is now a visible
+        connection between the GRK5-DAPK1 pair to the rest of the cluster via MAP3K12, which
+        was previosly hidden because MAP3K12 had a z-score slightly below 2.
 
 
-        ![alt text](assets/screenshot_3c_iteration2.png)
-
-        They have many connections,
-        but those connections aren't very specifict. In a synthetic network
-        like mine, too many edges suggests that the proteins isn't strongly connected
-        to anything. (You can also see it in their low ranks, if you were to look in
-        the z-score table, you will find that SRC and LRRK2 are the two lowest
-        scoring labels).
-        Note: I need to think/read about hub proteins more deeply. So my explanation
-        may not be entirely corrent.
-
-        Remove these two from the set, and re-run the experiment. The input label set
-        now looks like this:
+        From here, we can continue excising proteins that are not closely connected
+        to the cluster. Two prime targets are NEK2 and CDK9. The updated input
+        set is below
 
         ```
         ATM, ATR, AurA, AurB, CDK1, CDK4, CDK5, Chk1, Chk2, CK1A, CK2B,
         DAPK1, DNAPK, DYRK1A, DYRK2, ERK1, ERK2, GRK5, HIPK2, JNK1, JNK2, LKB1,
-        MAPKAPK5, NuaK1, P38A, P38G, PKCD, PRPK, SMG1, TAF1, VRK1
+        LRRK2, MAPKAPK5, NuaK1, P38A, P38G, PKCD, PLK3, PRPK, SMG1, TAF1, VRK1
         ```
+        and the result looks like so:
 
-        The output is now:
+        ![alt text](assets/example/resized-example_pic7.png)
 
-        ![alt text](assets/screenshot_3c_iteration3_.png)
+        The AUC is now 0.95, and we see good sub-clustering of input labels and top hits.
+        At this point, we shold stop optimizing, and interpret the results.
 
-        With SRC and LRRK2 gone, we can now see clear clusters in the remaining labels
-        and top hits. One last unconnected protein is GRK5. We can remove it, rerun, and
-        the final state of the experiment would be this:
-
-        ![alt text](assets/screenshot_3c_iteration4.png)
-
-
-        The cross-validation AUC is a respectable 0.87, and the hairball is gone. The
-        labels and their top hits are now interpretable by a human.
-
-        **Step 5: Interpret the results:**
+        **Step 5: Interpret the results**
 
         Let's circle back to our original hypothesis - clusters of connected proteins
         predict other proteins involved in the same activity by the virtue of being
-        connected. We now have a set of input labels that are connected (dimonds, AUC=0.87).
+        connected. We now have a set of input labels that are connected (dimonds, AUC=0.95).
 
         So then the top hits (proteins that were left unlabled) are our primary targets
         for being involved in some manner with P53. All those of proteins with z-score
@@ -406,7 +412,7 @@ tabs = {
 
         You can also see the table at the bottom:
 
-        ![alt text](assets/screenshot_4a.png)
+        ![alt text](assets/example/resized-example_pic8.png)
 
         Note that the labels are present in these tables (initial_state = 1). All those
         proteins with initial_state=0 are the predictions. **To run the experiment without
@@ -417,13 +423,16 @@ tabs = {
 
         ```
         Proteins on the top of the list are likely to be associated/interact with P53 or
-        P53 related processes: HIPK1, PRKDC, TLK3, BUB1B, etc, in the order of decreasing
+        P53 related processes: CHEK2, AURKB, CDK2, HIPK1, etc, in the order of decreasing
         z-score.
-
         ```
         And you can supply them with the graph, to see if any specific clusters / associations
         jump out.
 
+        **Note: If you don't want results of the cross-validation experiment, uncheck the
+        cross-validation box, and the table will not feature the input proteins.
+        Additionally, all input labels will be colored solid red (rather than gradient)
+        in the graph view. Other than that the results should be near-identical.**
 
         **Step 6: Bonus / Loose Ends**
 
