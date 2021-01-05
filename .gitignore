@@ -2,7 +2,6 @@ mypy.ini
 *.swp
 *.swo
 todolist
-data/*
 results/*
 *.pyc
 *.pkl
