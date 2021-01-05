@@ -298,7 +298,7 @@ tabs = {
         Paste the kinase list into the text box, check cross-validation, and press the
         DIFFUSE button.
 
-        ![alt text](assets/example/example_pic1.png)
+        ![example pic](assets/example/example_pic1.png)
 
         The cross-validation option is important, and should always be checked if your
         input set is larger than 1 protein. It conducts a cross-validation experiment
@@ -314,19 +314,19 @@ tabs = {
 
         So here is what the network of our top hits looks like now:
 
-        ![alt text](assets/example/example/resized-example_pic2.png)
+        ![example pic](assets/example/resized-example_pic2.png)
 
         Diamonds are the orignal input label set, and circles are the top hits. Color
         of the node corresponds to their rank/z-score. You can view z-score of each
         protein by clicking on it, and the z-score and rank will be displayed in the table
         below the main graph. For example, CDK2:
 
-        ![alt text](assets/example/resized-example_pic3.png)
+        ![example pic](assets/example/resized-example_pic3.png)
 
         Meanwhile, the circular layout is not super informative, so click on Force-directed layout.
         The result will look something like this:
 
-        ![alt text](assets/example/resized-example_pic4.png)
+        ![example pic](assets/example/resized-example_pic4.png)
 
         The graph looks like a bit of a mess, but we begin to see some separation between
         nodes.
@@ -376,7 +376,7 @@ tabs = {
         MAPKAPK5, NEK2, NuaK1, P38A, P38G, PKCD, PLK3, PRPK, SMG1, TAF1, VRK1
         ```
         The results will look like so:
-        ![alt text](assets/example/resized-example_pic5.png)
+        ![example pic](assets/example/resized-example_pic5.png)
 
         Because the isolated labels no longer introduce noise into the experiment,
         the AUC is now at a respectable 0.91. Additionally, there is now a visible
@@ -395,7 +395,7 @@ tabs = {
         ```
         and the result looks like so:
 
-        ![alt text](assets/example/resized-example_pic7.png)
+        ![example pic](assets/example/resized-example_pic7.png)
 
         The AUC is now 0.95, and we see good sub-clustering of input labels and top hits.
         At this point, we shold stop optimizing, and interpret the results.
@@ -412,7 +412,7 @@ tabs = {
 
         You can also see the table at the bottom:
 
-        ![alt text](assets/example/resized-example_pic8.png)
+        ![example pic](assets/example/resized-example_pic8.png)
 
         Note that the labels are present in these tables (initial_state = 1). All those
         proteins with initial_state=0 are the predictions. **To run the experiment without
