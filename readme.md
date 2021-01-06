@@ -36,15 +36,15 @@ Assuming you have python3.6+ installed:
 1. Create a virtual env
 2. Inside the env, install dependencies with
 
-    ```pip install -r requirements.txt```
+    ```$ pip install -r requirements.txt```
 
 ## Usage
-1. The network (```netowrk/kinase_matrix.pkl```) needed to run the front-end is pre-computed, 
-so to run the front-end locally, do
+1. The network needed to run the front-end is pre-computed (```netowrk/kinase_matrix.pkl```),
+so to run the front-end locally issue the following command in your terminal:
 
     ```$ python application.py```
 
-    in the terminal, and go to ```localhost:8050``` in your browser.
+    and then open the app in your browser at ```localhost:8050```.
 2. To regenerate/modify the network, run the ```create_go_similarity_kinase_network.ipynb```
 notebook and follow it cell by cell.
     - Note: the Gene Ontology files (annotations and the term ontology) that the network is constructed from
@@ -59,9 +59,9 @@ is already included under ```data/```, but you can re-run the notebook if you wa
 
 The front-ent is a Flask app, so it can be deployed seemlessly with most cloud providers.
 I deployed it with Heroku, and it was rather painless. Note that if you plan to plug
-in a proteome-scale network into the tool, you'll have to account for additional space
-requirements and diffusion times. The tool, as is, is designed assuming the network
-is small, and diffusion is near instant.
+in a proteome-scale network into the tool, you'll have to account for additional space/time
+requirements. The tool, as is, is designed for a small network with near-instant diffusion
+times.
 
 ## License
 
