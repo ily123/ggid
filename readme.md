@@ -52,8 +52,8 @@ notebook and follow it cell by cell.
     the [Gene Ontology website](http://geneontology.org/docs/downloads/). The code expects ```gaf-2``` format
     for the annotation corpus, and ```obo``` for the term ontology.
 3. There are a couple of other notebooks included, one has some exploratory analysis (```_explore_human_annotations.ipynb```)
-and the other one scrapes human kinase names from uniprot (```_get_human_kinases_from_uniprot.ipynb```). The kinase list
-is already included under ```data/```, but you can re-run the notebook if you want to update the list.
+and the other scrapes human kinase names from uniprot (```_get_human_kinases_from_uniprot.ipynb```). The kinases
+are already included under ```data/```, but you can re-run the notebook if you want to update the list.
 
 ## Deployment
 
