@@ -81,7 +81,7 @@ tabs = {
         and so on. These labels are  known as "GO terms" and they describe a protein's
         job within the cell. Because proteins that do
         similar jobs have similar GO terms, GO term similarity can be readily
-        converted into a network/graph (which we we can then learn from).
+        converted into a network/graph (which we can then learn from).
 
         To build a protein network from GO terms, we follow these steps:
 
@@ -101,7 +101,7 @@ tabs = {
             are related to each other and are organized in a tree, where each term
             has ancestors and children. Ancestor terms are more general and high-level, while
             children terms are more specific and low-level. For example, ```Signaling``` is a
-            general high-level term, and one of its children is the more specific ```Kinase signaling```.
+            general high-level term, and one of its children is the more specific ```negative regulation of signaling```.
             The child-ancestor relationships branch out with ancestors having multiple
             children.
 
@@ -121,7 +121,7 @@ tabs = {
             corpus. To make things more intuitive, we convert frequency into a positive
             number by taking a negative log of it (smaller frequency corresponds to higher negative log number).
 
-            In practise, the most informative common ancestor is usually the lowest common ancestor in the tree.
+            In practice, the most informative common ancestor is usually the lowest common ancestor in the tree.
             This is because terms lower in the tree are used less frequently, and are more specific.
 
             * To arrive at a final similarity score for two proteins, we measure the
@@ -146,16 +146,16 @@ tabs = {
         ---
 
         To extract information from the network, we can simply examine it by hand. Given a protein, what
-        are its closest neighbors? This works, but in practise gets out of hand quickly
+        are its closest neighbors? This works, but in practice gets out of hand quickly
         when you want to examine more than a single protein at the same time, or when the number of edges
         is too high. So it's best to use an algorithmic approach, such as Information
         Diffusion.
 
         Intuitively, Information Diffusion is exactly what it sounds like. We label
         some nodes in the network with information, then let information diffuse to other
-        nodes using edges as conduits. At the end of the diffusion experiment, nodes that retain the
+        nodes using edges as conduits. At the end of the diffusion experiment, nodes that accrue the
         most information are the ones that are most
-        closely connected to the original labeled nodes.
+        closely connected to the originally-labeled nodes.
 
         Using this method, we can discover clusters of proteins that do the same job.
         For example, label all proteins associated with ```disease X```, diffuse
@@ -168,7 +168,7 @@ tabs = {
         of [this paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3001439/).
 
         ---
-        However, here is a quick summary from someone who isnt that great at linear
+        However, here is a quick summary from someone who isn't that great at linear
         algebra:
 
         Diffusion of labels can be set up as a quadratic function H:
@@ -181,7 +181,7 @@ tabs = {
 
         * The first term ```(y-f)``` represents loss of initial label, and we
             want to minimize it (eg the originally-labeled nodes need to retain most of
-            their label).
+            their information).
 
         * The second term ```f(i) - f(j)``` represents the difference in label state
             of connected nodes (```G(i,j)``` is our graph, where ```G(i,j)=1``` if the two nodes
@@ -190,9 +190,10 @@ tabs = {
             smoothing, we can modulate constant ```alpha```.
 
         Given this linear system, we can solve for ```f``` using the graph diffusion
-        kernel. In practise,```f``` is the
-        post-diffusion "information content" of the node, and we use it as a measure
-        of the node's connectedness to the original site of the label.
+        kernel. In practice, ```f``` is the
+        post-diffusion "information content/label/state" of the node, and we use it as a measure
+        of the node's connectedness to the original site of the label. In the final tally of
+        ```f``` scores, we also convert them to z-scores for convenience/generalizability.
 
         ### Kinase network as model system
         ---
@@ -248,8 +249,8 @@ tabs = {
         Let's say you are interested in the protein P53, because it's involved in a
         cancer you care about. You read the literature on P53 and realize that it
         interacts with many kinases, and these interactions are critical to disease
-        progression. So you decide to test whether any of these kinase interactions
-        can be attenuated by drugs.
+        progression. In order to cure the P53-related cancer, you decide to test whether any of
+        these kinase interactions can be used as drug targets.
 
         However, before you embark on your drug screen, you wonder if your list of P53
         kinases (the one you got from the literature) is complete. Are there any
@@ -257,30 +258,36 @@ tabs = {
 
         To answer this question, you can use the GGID tool!
         The basic hypothesis the tool provides for you is:
+
         ```
-            Within the network of human kinases, neighbors of P53 kinases are also P53 kinases.
+        Within the network of human kinases, neighbors of P53 kinases are also P53 kinases.
         ```
+
         Given a set of input kinases (in this case, known P53 kinases), the tool
-        ranks every other kinase in the network based on how well they are connected
-        to the input set (using a method called Information Diffusion, see THEORY tab).
-        Kinases at the top of this ranked list are,
-        hypothetically, P53 kinases. After you test them for P53 phosphorylation
-        activity to verify that they are indeed P53 kinases (which in itself is a major
-        contribution to the field), you can include them in your drug screen.
+        labels these kinases in the network, and then diffuses the label to other nodes in the
+        network. The tool then measures how much information diffused to each
+        previously-unlabeled node, and uses it as proxy to judge how well each node is
+        connected to the initial label set (see THEORY tab).
+        Kinases at the top of the post-diffusion label ranked list are,
+        hypothetically, connected to P53. So after verifying,
+        you can include them in your drug screen.
 
-        Before I go through the procedure for using this tool, I'd like to emphasize
+        ---
+
+        Before I continue with the P53 example, I'd like to emphasize
         that the tool is completely generic. In this example, we are using P53 kinases,
-        but list of input kinases can be any set of kinases that you think are relevant
-        to your question.
+        but input kinase labels can be any set of kinases that you think share
+        some relavant property (kinases of some other protein, kinases involved in a specific
+        signaling pathaway, kinases involved in a specific disease, etc).
 
-        ### How to use the tool
+        ### How to use the tool (to suggest novel P53 kinases)
 
         **Step 1: Come up with a list of known P53 kinases.**
 
         Before you start, you need to identify the list of known positives, i.e. known
         P53 kinases.
 
-        You can do it by reading literature or using a database like [Phosphosite](www.phosphosite.org).
+        You can do it by reading the literature or using a database like [Phosphosite](www.phosphosite.org).
         For the purposes of this demo, let's skip over to [P53's page on Phosphosite](https://www.phosphosite.org/proteinAction.action?id=465&showAllSites=true)
         and then go the *Upstream* tab. This tab lists all upstream regulators of P53.
         One of the categories in the tab is *Kinases, in vitro*. This is the list of
@@ -312,14 +319,14 @@ tabs = {
         closely they are connected to the input label set (measured as label z-score, see
         THEORY for details). By default all proteins with z-score >= 2 are plotted on the graph.
 
-        So here is what the network of our top hits looks like now:
+        So here is what the graph of our top hits looks like now:
 
         ![example pic](assets/example/resized-example_pic2.png)
 
-        Diamonds are the orignal input label set, and circles are the top hits. Color
+        Diamonds are the orignal input labels, and circles are the unlabeled proteins with
+        post-diffusion z-score of 2 or more. Color
         of the node corresponds to their rank/z-score. You can view z-score of each
-        protein by clicking on it, and the z-score and rank will be displayed in the table
-        below the main graph. For example, CDK2:
+        protein by clicking on it. For example, CDK2:
 
         ![example pic](assets/example/resized-example_pic3.png)
 
@@ -335,33 +342,34 @@ tabs = {
 
 
         * There are some input labels, boxed in red, not connected to the main cluster.
-        Because they are not connected to the rest of the input set, they have fairly
-        low cross-validation ranks, especially SRC, PAK4 (tied for rank=313), and BTK (rank=306).
-        This is exactly what we would expect from disconnected proteins -- they are not
-        predicted by the rest of the input set.
+        Because they are not connected to the rest of the input set, information
+        does not diffuse to them so they score low in cross-validation.
+        Especially low are SRC, PAK4 (tied for rank=313), and BTK (rank=306).
 
-         Why are they disconnected? It's possible that they are underannoated (and thus
-        don't have strong connections to the more well-annotated proteins in the set),
-        or they are part of a separate cluster. The input set of P53 proteins is quite
-        large, and it's likely that there are multiple subclusters, poorly connected
-        to the main cluster, of which PAK4 and SRC are a part of.
+         Why are these proteins disconnected? It's possible that they are underannoated,
+         and and thus don't have strong connections to the more well-annotated proteins in the set.
+         Alternatively, they can be part of their own functional cluster. The input set
+         of P53 proteins is quite large, and it's likely that there are multiple
+         subclusters that do different jobs.
 
-        * The metric of how good the labels connect to each other is the cross-validation
+        * The metric for how well the input labels connect to each other is the cross-validation
         AUC. You can read about cross-validation in detail [here](https://en.wikipedia.org/wiki/Cross-validation_(statistics)#Leave-one-out_cross-validation).
-        We leave one of our input labels unlabeled, and diffuse the remaining N-1 labels
-        to see if the left-out label is closely connected to them. We repeat this for
-        every label, and summarize results as ROC curve. The close the are under the
-        curve, the more connected (more predictive of each other) the input labels are.
+
+         To conduct cross-validation, we leave one of the input labels unlabeled, and diffuse the remaining N-1 labels
+        to see if the left-out label is closely connected to the set. If it is, it will
+        get a high post-diffusion score. We repeat this for
+        every label, and summarize results as a ROC curve. The closer the area under
+        the curve is to 1, the better. You can see the curve by clicking on "Cross-validation AUC"
+        collapsible.
 
         **Why do we care if the labels are connected to each other?** If they are connected
         to each other, then our initial assumption that these labels do the same thing
-        (and can therefore predict similar things) is correct. If the labels are not
+        (and can therefore predict other proteins that are involved in the process) is correct. If the labels are not
         connected, the our input set is not informative. It's just a collection of unconnected
-        proteins!
+        proteins! Cross-validation allows us to check.
 
-        Right now, AUC=0.77, meaning the labels are somewhat
-        connected, but there is some noise. We can work with the list of the top
-        hits, but let's try to fine-tune our inputs.
+        Right now, AUC is 0.77, meaning the labels are somewhat
+        connected, but there is some noise. Let's try to fine-tune our inputs.
 
         ---
 
@@ -384,9 +392,9 @@ tabs = {
         was previously hidden because MAP3K12 had a z-score slightly below 2.
 
 
-        From here, we can continue excising proteins that are not closely connected
-        to the cluster. Two prime targets are NEK2 and CDK9. The updated input
-        set is below
+        From here, we can continue excising proteins that are not strongly connected
+        to the cluster. Two prime targets are NEK2 and CDK9 (both rank outside top 100).
+        The updated input set is below
 
         ```
         ATM, ATR, AurA, AurB, CDK1, CDK4, CDK5, Chk1, Chk2, CK1A, CK2B,
@@ -402,46 +410,24 @@ tabs = {
 
         **Step 5: Interpret the results**
 
-        Let's circle back to our original hypothesis - clusters of connected proteins
-        predict other proteins involved in the same activity by the virtue of being
-        connected. We now have a set of input labels that are connected (diamonds, AUC=0.95).
+        Let's circle back to our original hypothesis - network connection predicts
+        functional similarity. We now have a solid set of input labels that are strongly
+        connected (diamonds, AUC=0.95). By diffusing them, we get a list of other kinases closely connected to
+        them in the network. These are the kinases in the graph view.
 
-        So then the top hits (proteins that were left unlabled) are our primary targets
-        for being involved in some manner with P53. All those of proteins with z-score
-        >2 are in the graph.
+        These proteins, because they are connected to the input set, are likely
+        connected in some form to P53. They are the list of putative P53 kinases.
+        You can pass it to your wet-lab collaborators and ask them to test whether any
+        of these proteins actually interact with P53 in-vitro.
 
-        You can also see the table at the bottom:
+        In addition to the graph view, you can see the z-score for every kinase below
+        in the table:
 
         ![example pic](assets/example/resized-example_pic8.png)
 
-        Note that the labels are present in these tables (initial_state = 1). All those
-        proteins with initial_state=0 are the predictions. **To run the experiment without
-        LOO (no labels in the output table), unched LOO box and re-run.**
-
-        You can now pass this list of top hits to your domain/experts experimentalists
-        with the following message:
-
-        ```
-        Proteins on the top of the list are likely to be associated/interact with P53 or
-        P53 related processes: CHEK2, AURKB, CDK2, HIPK1, etc, in the order of decreasing
-        z-score.
-        ```
-        And you can supply them with the graph, to see if any specific clusters / associations
-        jump out.
-
-        **Note: If you don't want results of the cross-validation experiment, uncheck the
-        cross-validation box, and the table will not feature the input proteins.
-        Additionally, all input labels will be colored solid red (rather than gradient)
-        in the graph view. Other than that the results should be near-identical.**
-
-        **Step 6: Bonus / Loose Ends**
-
-        So what about all those labels we removed? Are they useless? Some of them are
-        (in the context of our synthetic GO term network). They are poorly annotated
-        and not connected to anything too specific.
-
-        Others are simply involved in some facet of P53 action that's not common to the
-        labels that remained in our final set. To get a better idea what those labels
-        interact with, you should diffuse them individually.
+        Note that the input labels (boxed in red) are present in the results table (initial_state = 1), if
+        you are running cross-validation. Once you are happy with your input set,
+        you can uncheck cross-validation, and the table will only feature unlabeled
+        proteins.
         """,
 }
