@@ -52,7 +52,7 @@ tabs = {
         In practice, this means that once you've identified a protein associated with some critical
         process, you can query that protein's network to find
         additional proteins that are involved in the same process.
-        In case of disease, this allows you to expand the candidate list of theraupetic targets, and arrive at
+        In case of disease, this allows you to expand the candidate list of theraupeutic targets, and arrive at
         a cure faster.
 
         Construction of protein networks, and learning from them, is one of the
@@ -77,7 +77,7 @@ tabs = {
         is to movies. It's a database that catalogues proteins, and assigns them
         descriptive labels. Whereas IMDB may label movies as
         "comedy", "action", etc, the Gene Ontology annotates proteins
-        with labels such as "protein kinase", "mitochondirial process", "cell wall",
+        with labels such as "protein kinase", "signaling", "cell wall",
         and so on. These labels are  known as "GO terms" and they describe a protein's
         job within the cell. Because proteins that do
         similar jobs have similar GO terms, GO term similarity can be readily
@@ -85,7 +85,7 @@ tabs = {
 
         To build a protein network from GO terms, we follow these steps:
 
-        1. Given a set of proteins, we measure GO term similariy between each possible pair
+        1. Given a set of proteins, we measure GO term similarity between each possible pair
          of proteins in the set. To measure GO term similarity between two proteins, we
          do the following:
             * We define GO term similarity of two proteins as the average similarity
@@ -136,7 +136,7 @@ tabs = {
         of highly-similar proteins, while low scores correspond to proteins that are
         dissimilar. To convert the matrix into a graph, we go trough each
             protein (ie column/row in the matrix) and set the top 5 of its most similar
-            partner proteins as edges, and discrad all other pairs. This produced a protein
+            partner proteins as edges, and discard all other pairs. This produced a protein
             graph where each protein is connected to 5 proteins that it is most similar to.
 
         3. To learn from this network, we then use information diffusion
@@ -179,7 +179,7 @@ tabs = {
         label, and ```0``` otherwise), and ```f``` is the final label vector post-diffusion.
         The goal is to minimize H by balancing the two counter-acting terms:
 
-        * The first term ```(y-f)``` represents loss of inital label, and we
+        * The first term ```(y-f)``` represents loss of initial label, and we
             want to minimize it (eg the originally-labeled nodes need to retain most of
             their label).
 
@@ -192,7 +192,7 @@ tabs = {
         Given this linear system, we can solve for ```f``` using the graph diffusion
         kernel. In practise,```f``` is the
         post-diffusion "information content" of the node, and we use it as a measure
-        of the node's connectedness to the orignal site of the label.
+        of the node's connectedness to the original site of the label.
 
         ### Kinase network as model system
         ---
@@ -266,7 +266,7 @@ tabs = {
         Kinases at the top of this ranked list are,
         hypothetically, P53 kinases. After you test them for P53 phosphorylation
         activity to verify that they are indeed P53 kinases (which in itself is a major
-        contritubtion to the field), you can include them in your drug screen.
+        contribution to the field), you can include them in your drug screen.
 
         Before I go through the procedure for using this tool, I'd like to emphasize
         that the tool is completely generic. In this example, we are using P53 kinases,
@@ -281,7 +281,7 @@ tabs = {
         P53 kinases.
 
         You can do it by reading literature or using a database like [Phosphosite](www.phosphosite.org).
-        For the purposes of this demo, let's skip over to [P53's page on Phoshosite](https://www.phosphosite.org/proteinAction.action?id=465&showAllSites=true)
+        For the purposes of this demo, let's skip over to [P53's page on Phosphosite](https://www.phosphosite.org/proteinAction.action?id=465&showAllSites=true)
         and then go the *Upstream* tab. This tab lists all upstream regulators of P53.
         One of the categories in the tab is *Kinases, in vitro*. This is the list of
         kinases that are known to phosphorylate P53 in the test tube. Here is the list:
@@ -293,7 +293,7 @@ tabs = {
 
         ---
 
-        **Step 2: Enter known kinases and conduct diffusion experiment (with corss-validation):**
+        **Step 2: Enter known kinases and conduct diffusion experiment (with cross-validation):**
 
         Paste the kinase list into the text box, check cross-validation, and press the
         DIFFUSE button.
@@ -310,7 +310,7 @@ tabs = {
 
         The output of the diffusion experiment is the list of proteins ranked by how
         closely they are connected to the input label set (measured as label z-score, see
-        THEORY for details). By default all proteins with zscore >= 2 are plotted on the graph.
+        THEORY for details). By default all proteins with z-score >= 2 are plotted on the graph.
 
         So here is what the network of our top hits looks like now:
 
@@ -359,7 +359,7 @@ tabs = {
         connected, the our input set is not informative. It's just a collection of unconnected
         proteins!
 
-        Right now, AUC=0.77, meaning the lables are somewhat
+        Right now, AUC=0.77, meaning the labels are somewhat
         connected, but there is some noise. We can work with the list of the top
         hits, but let's try to fine-tune our inputs.
 
@@ -381,7 +381,7 @@ tabs = {
         Because the isolated labels no longer introduce noise into the experiment,
         the AUC is now at a respectable 0.91. Additionally, there is now a visible
         connection between the GRK5-DAPK1 pair to the rest of the cluster via MAP3K12, which
-        was previosly hidden because MAP3K12 had a z-score slightly below 2.
+        was previously hidden because MAP3K12 had a z-score slightly below 2.
 
 
         From here, we can continue excising proteins that are not closely connected
@@ -398,13 +398,13 @@ tabs = {
         ![example pic](assets/example/resized-example_pic7.png)
 
         The AUC is now 0.95, and we see good sub-clustering of input labels and top hits.
-        At this point, we shold stop optimizing, and interpret the results.
+        At this point, we should stop optimizing, and interpret the results.
 
         **Step 5: Interpret the results**
 
         Let's circle back to our original hypothesis - clusters of connected proteins
         predict other proteins involved in the same activity by the virtue of being
-        connected. We now have a set of input labels that are connected (dimonds, AUC=0.95).
+        connected. We now have a set of input labels that are connected (diamonds, AUC=0.95).
 
         So then the top hits (proteins that were left unlabled) are our primary targets
         for being involved in some manner with P53. All those of proteins with z-score
@@ -416,7 +416,7 @@ tabs = {
 
         Note that the labels are present in these tables (initial_state = 1). All those
         proteins with initial_state=0 are the predictions. **To run the experiment without
-        LOO (no labels in the output table), uncked LOO box and re-run.**
+        LOO (no labels in the output table), unched LOO box and re-run.**
 
         You can now pass this list of top hits to your domain/experts experimentalists
         with the following message:
