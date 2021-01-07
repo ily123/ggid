@@ -415,13 +415,9 @@ tabs = {
         connected (diamonds, AUC=0.95). By diffusing them, we get a list of other kinases closely connected to
         them in the network. These are the kinases in the graph view.
 
-        These proteins, because they are connected to the input set, are likely
-        connected in some form to P53. They are the list of putative P53 kinases.
-        You can pass it to your wet-lab collaborators and ask them to test whether any
-        of these proteins actually interact with P53 in-vitro.
 
-        In addition to the graph view, you can see the z-score for every kinase below
-        in the table:
+        In addition to the graph view, you can see the z-score for every kinase
+        in the table under "Full z-score and ranks table":
 
         ![example pic](assets/example/resized-example_pic8.png)
 
@@ -429,5 +425,10 @@ tabs = {
         you are running cross-validation. Once you are happy with your input set,
         you can uncheck cross-validation, and the table will only feature unlabeled
         proteins.
+
+        The top-scoring kinases in the table likely functionally connected to P53.
+        This is the list of putative P53 kinases. Ideally, you can pass it to your wet-lab
+        collaborators and ask them to test whether any of these proteins actually
+        interact with P53 in-vitro.
         """,
 }
