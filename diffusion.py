@@ -10,13 +10,10 @@ Usage:
 
 import numpy as np
 import pandas as pd
+from scipy import sparse, stats
+from scipy.sparse.linalg import lgmres
 
 pd.options.mode.chained_assignment = None
-
-from scipy import sparse, stats
-from scipy.sparse.linalg import lgmres, minres
-
-from kinapp_helper import InputValidator
 
 
 class Diffusion:

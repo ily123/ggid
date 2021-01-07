@@ -25,7 +25,7 @@ class LOOValitation:
         self.network = network
         self.input_nodes = input_nodes
         if len(self.input_nodes) < 2:
-            raise ("need at least 2 input nodes for cross-validation")
+            raise ValueError("need at least 2 input nodes for cross-validation")
         self.result = None
 
     def run_validation(self):

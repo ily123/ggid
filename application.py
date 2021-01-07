@@ -1,6 +1,5 @@
 import pickle
 import re
-import time
 
 import dash
 import dash_bootstrap_components as dbc
@@ -8,12 +7,9 @@ import dash_core_components as dcc
 import dash_cytoscape as cyto
 import dash_html_components as html
 import dash_table
-import dash_table.FormatTemplate as FormatTemplate
 import pandas as pd
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output, State
-from dash_table.Format import Format, Scheme, Sign, Symbol
-from scipy import sparse
 
 import app_text
 import color_gradient

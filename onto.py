@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Type, Union
+from typing import Dict, List, Type, Union
 
 import numpy as np
 import pandas as pd
