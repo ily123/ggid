@@ -5,6 +5,8 @@ The deployed app lives [here](https://ggid.herokuapp.com/).
 
 ![Python](https://img.shields.io/badge/python-3.6%7C3.7-blue.svg)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Total alerts](https://img.shields.io/lgtm/alerts/g/ily123/ggid.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ily123/ggid/alerts/)
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/ily123/ggid.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ily123/ggid/context:python)
 
 ## Table of Content
 1. [Graphical Abstract](#graphical-abstract)
