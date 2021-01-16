@@ -28,7 +28,7 @@ cyto.load_extra_layouts()
 
 
 def get_diffusion_result(labeled_kinases, zscore_cutoff):
-    """Returns container with formatted diffusion results."""
+    """Returns components of the diffusion results."""
     experiment = diffusion.Diffusion(network, labeled_kinases)
     result = experiment.diffuse()
     # make z-score table
@@ -334,11 +334,11 @@ def get_main_tab():
         html.Br(),
         html.Div(id="status-line"),
         html.Br(),
-        html.Div(
-            id="kin-map-container",
-            children=[
+        dbc.Form(
+            [
                 dbc.FormGroup(
-                    [
+                    id="kin-map-layout-selector",
+                    children=[
                         dbc.Label("Adjust graph layout"),
                         dbc.RadioItems(
                             id="network-layout-toggle",
@@ -346,8 +346,14 @@ def get_main_tab():
                             value="circle",
                             inline=True,
                         ),
-                    ]
-                ),
+                    ],
+                )
+            ]
+        ),
+        html.Hr(),
+        html.Div(
+            id="kin-map-container",
+            children=[
                 # DBC package (?) broke zoom and panning, so I had to use
                 # raw pixels to set size of network area, and
                 # to specify pan and zoom manually -- not a fan!
@@ -358,24 +364,24 @@ def get_main_tab():
                     style={
                         "height": "600px",
                         "width": "1000px",
-                        "border": "1px solid grey",
                     },
                     zoom=0.1,
                     elements=get_network_elements(network),
                     pan={"x": 500, "y": 300},
                 ),
-                html.Div(
-                    id="node-info-wrapper",
-                    children=[
-                        html.Table(id="node-info", children=construct_empty_table()),
-                        html.P(
-                            """Note: input proteins are excluded from
+            ],
+        ),
+        html.Hr(),
+        html.Div(
+            id="node-info-wrapper",
+            children=[
+                html.Table(id="node-info", children=construct_empty_table()),
+                html.P(
+                    """Note: input proteins are excluded from
                           ranking unless cross-validated."""
-                        ),
-                    ],
-                    style={"display": "None"},
                 ),
             ],
+            style={"display": "None"},
         ),
         html.Div(id="results-container", children=[]),
         # Line below is a hidden utility switch for chaining callbacks
@@ -494,6 +500,7 @@ app.layout = dbc.Container(
     prevent_initial_call=True,
 )
 def display_tapped_node_data(data, diffusion_switch):
+    """Displays node ranks in table below graph."""
     if diffusion_switch != "valid":
         return None  # unless diffusion experiment has been done, return nothing
     out = construct_empty_table()
