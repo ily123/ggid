@@ -34,8 +34,12 @@ However, here is a brief overview:
 
 Assuming you have python3.6+ installed:
 
-1. Create a virtual env
-2. Inside the env, install dependencies with
+1. Clone repo to local machine with
+
+    ```git clone https://github.com/ily123/ggid```
+
+2. Create a virtual env
+3. Inside the env, install dependencies with
 
     ```$ pip install -r requirements.txt```
 
@@ -58,7 +62,7 @@ are already included under ```data/```, but you can re-run the notebook if you w
 
 ## Deployment
 
-The front-ent is a Flask app, so it can be deployed seemlessly with most cloud providers.
+The front-end is a Flask app, so it can be deployed seemlessly with most cloud providers.
 I deployed it with Heroku, and it was rather painless. Note that if you plan to plug
 in a proteome-scale network into the tool, you'll have to account for additional space/time
 requirements. The tool, as is, is designed for a small network with near-instant diffusion
