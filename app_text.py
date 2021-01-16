@@ -73,15 +73,12 @@ tabs = {
         ### Gene Ontology (GO) similarity network
         ---
 
-        [Gene Ontology](http://geneontology.org/) database is to proteins what the [IMDB](https://www.imdb.com)
-        is to movies. It's a database that catalogues proteins, and assigns them
-        descriptive labels. Whereas IMDB may label movies as
-        "comedy", "action", etc, the Gene Ontology annotates proteins
-        with labels such as "protein kinase", "signaling", "cell wall",
-        and so on. These labels are  known as "GO terms" and they describe a protein's
-        job within the cell. Because proteins that do
-        similar jobs have similar GO terms, GO term similarity can be readily
-        converted into a network/graph (which we can then learn from).
+        [Gene Ontology](http://geneontology.org/) is a database that catalogues
+        proteins, and assigns them descriptive labels such as "protein kinase",
+        "signaling", "cell wall", and so on. These labels are referred to as "GO terms"
+        and they describe a protein's job within the cell. Because proteins that do
+        similar jobs have similar GO terms, GO term similarity can be used to
+        construct protein networks where similar proteins are connected.
 
         To build a protein network from GO terms, we follow these steps:
 
@@ -134,7 +131,7 @@ tabs = {
         2. Once we have computed similarity for every protein pair in the set,
         we have a similarity matrix. In this matrix, higher scores correspond to pairs
         of highly-similar proteins, while low scores correspond to proteins that are
-        dissimilar. To convert the matrix into a graph, we go trough each
+        dissimilar. To convert the matrix into a graph, we go through each
             protein (ie column/row in the matrix) and set the top 5 of its most similar
             partner proteins as edges, and discard all other pairs. This produced a protein
             graph where each protein is connected to 5 proteins that it is most similar to.
@@ -146,7 +143,7 @@ tabs = {
         ---
 
         To extract information from the network, we can simply examine it by hand. Given a protein, what
-        are its closest neighbors? This works, but in practice gets out of hand quickly
+        are its closest neighbors? This is valid approach, but it gets out of hand quickly
         when you want to examine more than a single protein at the same time, or when the number of edges
         is too high. So it's best to use an algorithmic approach, such as Information
         Diffusion.
@@ -160,16 +157,15 @@ tabs = {
         Using this method, we can discover clusters of proteins that do the same job.
         For example, label all proteins associated with ```disease X```, diffuse
         that label, and measure amount of information in each node post diffusion.
-        Rank the originally unlabled nodes by the amount of information they retained.
+        Next, the originally unlabled nodes are by the amount of information they retained.
         Proteins at the top of the ranked list are likely to be involved in
         ```disease X```.
 
-        For formal mathematic definition of diffusion see the methods section
+        For a formal mathematic definition of diffusion see the methods section
         of [this paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3001439/).
 
         ---
-        However, here is a quick summary from someone who isn't that great at linear
-        algebra:
+        However, here is a quick summary.
 
         Diffusion of labels can be set up as a quadratic function H:
 
@@ -179,12 +175,12 @@ tabs = {
         label, and ```0``` otherwise), and ```f``` is the final label vector post-diffusion.
         The goal is to minimize H by balancing the two counter-acting terms:
 
-        * The first term ```(y-f)``` represents loss of initial label, and we
+        * The first term ```(y-f)``` represents loss of the initial label, and we
             want to minimize it (eg the originally-labeled nodes need to retain most of
             their information).
 
         * The second term ```f(i) - f(j)``` represents the difference in label state
-            of connected nodes (```G(i,j)``` is our graph, where ```G(i,j)=1``` if the two nodes
+            of two connected nodes (edges are defined by ```G(i,j)```, where ```G(i,j)=1``` if the two nodes
             are connected and ```0``` otherwise). To minimize this term, we want to ensure
             that label information is distributed smoothly over the network. To promote
             smoothing, we can modulate constant ```alpha```.
@@ -347,7 +343,7 @@ tabs = {
         Especially low are SRC, PAK4 (tied for rank=313), and BTK (rank=306).
 
          Why are these proteins disconnected? It's possible that they are underannoated,
-         and and thus don't have strong connections to the more well-annotated proteins in the set.
+         and thus don't have strong connections to the more well-annotated proteins in the set.
          Alternatively, they can be part of their own functional cluster. The input set
          of P53 proteins is quite large, and it's likely that there are multiple
          subclusters that do different jobs.
@@ -426,9 +422,17 @@ tabs = {
         you can uncheck cross-validation, and the table will only feature unlabeled
         proteins.
 
-        The top-scoring kinases in the table likely functionally connected to P53.
-        This is the list of putative P53 kinases. Ideally, you can pass it to your wet-lab
-        collaborators and ask them to test whether any of these proteins actually
-        interact with P53 in-vitro.
+        The top-scoring kinases in the table are likely functionally connected to P53.
+        This is the list of putative P53 kinases.i
+
+        **Errata**
+        * In the figures, AURKB appears as one of the top hits. It's a known P53 kinase.
+        Why is it in the prediction list? Shouldn't it be an input label?
+
+        AURKB appears as "AurB" in the phoshosite database, and the tool does not
+        recognize "AurB" as a valid input name. So it gets filtered out of the input
+        set, and then predicted (under the "AURKB" id) as a P53 kinase. There may be
+        other mistakes like this in the example set. Better id matching is on the TODO
+        list.
         """,
 }
