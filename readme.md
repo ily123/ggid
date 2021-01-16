@@ -36,7 +36,7 @@ Assuming you have python3.6+ installed:
 
 1. Clone repo to local machine with
 
-    ```git clone https://github.com/ily123/ggid```
+    ```$ git clone https://github.com/ily123/ggid```
 
 2. Create a virtual env
 3. Inside the env, install dependencies with
